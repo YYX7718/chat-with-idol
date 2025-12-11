@@ -1,0 +1,39 @@
+# 环境变量文件（包含API密钥）
+.env
+.env.local
+.env.*.local
+
+# 依赖目录
+node_modules/
+__pycache__/
+*.pyc
+venv/
+env/
+
+# 开发日志
+logs/
+*.log
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 构建产物
+dist/
+build/
+*.sqlite3
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+.coverage
+.coverage.*
+htmlcov/
+
+# 临时文件
+*.tmp
+*.temp
