@@ -1,8 +1,20 @@
 import axios from 'axios'
 
+// 获取 API 基础地址
+// 开发环境：使用代理 '/api'
+// 生产环境：使用环境变量 VITE_API_BASE_URL（如果设置了）
+const getBaseURL = () => {
+  // 如果设置了环境变量，使用环境变量（生产环境）
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL
+  }
+  // 否则使用相对路径（开发环境，通过 Vite 代理）
+  return '/api'
+}
+
 // 创建 axios 实例
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: getBaseURL(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

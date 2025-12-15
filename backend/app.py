@@ -1,10 +1,20 @@
-from flask import Flask, request, jsonify
+import os
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 from models.chat_session import SessionManager
 from services.idol_chat_service import idol_chat_service
 from services.divination_service import divination_service
 
 # 创建Flask应用
-app = Flask(__name__)
+# 如果存在 static 目录（Docker 部署），则使用它作为静态文件目录
+static_folder = 'static' if os.path.exists('static') else None
+app = Flask(__name__, static_folder=static_folder, static_url_path='')
+
+# 配置 CORS（跨域资源共享）
+# 开发环境：允许所有来源（仅用于本地开发）
+# 生产环境：应该限制为特定域名
+cors_origins = os.getenv('CORS_ORIGINS', '*').split(',')
+CORS(app, origins=cors_origins, supports_credentials=True)
 
 # 初始化会话管理器
 session_manager = SessionManager()
@@ -198,5 +208,28 @@ def get_divination_history(session_id):
         "divinations": [div.to_dict() for div in divinations]
     })
 
+# 提供前端静态文件（用于 Docker 部署）
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """
+    提供前端静态文件
+    如果存在 static 目录，则提供前端文件；否则返回 404
+    """
+    if static_folder and os.path.exists(static_folder):
+        if path != "" and os.path.exists(os.path.join(static_folder, path)):
+            return send_from_directory(static_folder, path)
+        else:
+            # 对于前端路由，返回 index.html
+            return send_from_directory(static_folder, 'index.html')
+    else:
+        # 开发环境或分离部署，不提供静态文件
+        return jsonify({"message": "Frontend not available. Please access frontend separately."}), 404
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # 从环境变量读取配置
+    debug_mode = os.getenv('FLASK_DEBUG', 'True').lower() == 'true'
+    port = int(os.getenv('FLASK_PORT', '5000'))
+    
+    # 生产环境应该设置 debug=False
+    app.run(debug=debug_mode, port=port, host='0.0.0.0')

@@ -1,6 +1,8 @@
 flask
+flask-cors
 python-dotenv
 openai
 deepseek-ai
 sqlalchemy
 uuid
+requests
