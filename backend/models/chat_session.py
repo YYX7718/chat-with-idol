@@ -34,6 +34,11 @@ class Divination:
         }
 
 class ChatSession:
+    # 会话状态常量
+    STATE_DIVINATION = "DIVINATION"
+    STATE_TRANSITION = "TRANSITION"
+    STATE_IDOL_CHAT = "IDOL_CHAT"
+
     def __init__(self, idol_id, user_id=None):
         self.session_id = str(uuid.uuid4())
         self.idol_id = idol_id
@@ -42,6 +47,8 @@ class ChatSession:
         self.updated_at = datetime.now().isoformat()
         self.messages = []
         self.divinations = []
+        # 初始状态设置为占卜阶段
+        self.current_state = self.STATE_DIVINATION
     
     def add_message(self, role, content):
         message = Message(role, content)
@@ -53,7 +60,20 @@ class ChatSession:
         divination = Divination(divination_type, question, result)
         self.divinations.append(divination)
         self.updated_at = datetime.now().isoformat()
+        # 占卜完成后自动切换到过渡阶段
+        self.current_state = self.STATE_TRANSITION
         return divination
+
+    def set_state(self, state):
+        """
+        设置会话状态
+        """
+        valid_states = [self.STATE_DIVINATION, self.STATE_TRANSITION, self.STATE_IDOL_CHAT]
+        if state in valid_states:
+            self.current_state = state
+            self.updated_at = datetime.now().isoformat()
+            return True
+        return False
     
     def to_dict(self):
         return {
@@ -62,6 +82,7 @@ class ChatSession:
             "user_id": self.user_id,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "current_state": self.current_state,
             "messages": [msg.to_dict() for msg in self.messages]
         }
     
