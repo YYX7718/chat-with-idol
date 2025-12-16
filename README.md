@@ -8,12 +8,12 @@
 
 <div align="center">
 
-### 🚀 [点击这里体验在线版本 →](https://your-demo-url.com)
+### 🚀 [点击这里体验在线版本 →](https://starchat26.zeabur.app)
 
-[![在线演示](https://img.shields.io/badge/🌐-在线演示-blue?style=for-the-badge)](https://your-demo-url.com)
+[![在线演示](https://img.shields.io/badge/🌐-在线演示-blue?style=for-the-badge)](https://starchat26.zeabur.app)
 
-> 💻 **演示地址**：https://your-demo-url.com  
-> ⚠️ **提示**：请将链接替换为你的实际部署地址
+> 💻 **演示地址**：https://starchat26.zeabur.app  
+> ⚠️ **提示**：如果你重新部署了前端，请把链接更新为最新域名
 
 </div>
 

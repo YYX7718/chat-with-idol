@@ -1,18 +1,44 @@
 <template>
   <div id="app">
     <div class="app-container">
-      <router-view />
+      <component :is="currentComponent" />
     </div>
   </div>
 </template>
 
-<script>
-// 由于我们使用简单的路由机制，这里不引入Vue Router
-// 而是使用window.location.href进行页面导航
+<script setup>
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import ChooseIdol from './pages/choose-idol.vue'
+import IdolChat from './pages/idol-chat.vue'
 
-export default {
-  name: 'App'
+// 简单的 hash 路由：#/chat 切到聊天，其余回到选择页
+const route = ref(getRoute())
+
+const getComponent = {
+  home: ChooseIdol,
+  chat: IdolChat
 }
+
+const currentComponent = computed(() => getComponent[route.value] || ChooseIdol)
+
+function getRoute() {
+  const hash = window.location.hash || ''
+  if (hash.startsWith('#/chat')) return 'chat'
+  return 'home'
+}
+
+const onHashChange = () => {
+  route.value = getRoute()
+}
+
+onMounted(() => {
+  window.addEventListener('hashchange', onHashChange)
+  route.value = getRoute()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', onHashChange)
+})
 </script>
 
 <style>
