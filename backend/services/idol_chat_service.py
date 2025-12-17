@@ -33,17 +33,14 @@ JSON 结构如下：
         
         try:
             response_text = self.llm_client.generate_response(prompt)
-            # 清理可能的 markdown 标记
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             persona_config = json.loads(response_text)
             
-            # 确保 name 字段存在
             if "name" not in persona_config:
                 persona_config["name"] = idol_name
                 
             return persona_config
         except Exception as e:
-            # 降级处理
             print(f"Persona generation failed: {e}")
             return {
                 "name": idol_name,
@@ -64,8 +61,7 @@ JSON 结构如下：
         :param translate: 如果 True，附带中文翻译（当偶像为非中文母语时）
         :return: dict { persona_reply, language, translation(optional), reminder_virtual }
         """
-        # 获取最近的消息历史
-        recent_messages = session.messages[-10:]  # 只使用最近10条消息
+        recent_messages = session.messages[-10:]
 
         prompt = self._create_chat_prompt(idol_info, recent_messages)
         response = self.llm_client.generate_response(prompt)
@@ -76,8 +72,6 @@ JSON 结构如下：
             "reminder_virtual": "提示：本对话由虚拟 AI 人设扮演，仅供娱乐与情绪陪伴。"
         }
 
-        # 简单翻译（若请求且偶像非中文）
-        # 注意：这里假设 idol_info 里的 default_language 是准确的
         if translate and idol_info.get('default_language') != 'zh':
             trans_prompt = f"Translate the following text to Chinese:\n\n{response}"
             translation = self.llm_client.generate_response(trans_prompt)
@@ -89,14 +83,12 @@ JSON 结构如下：
         """
         创建聊天提示词，确保偶像使用其母语回复
         """
-        # 获取偶像的默认语言
         default_language = idol_info.get("default_language", "zh")
         name = idol_info.get("name", "Unknown Idol")
         tone = ", ".join(idol_info.get("tone", []))
         culture = idol_info.get("culture", "Unknown")
         speech_style = idol_info.get("speech_style_notes", "")
         
-        # 构建系统提示词
         system_prompt = f"""
 You are a virtual therapeutic persona inspired by {name}.
 You are not the real person.
@@ -118,13 +110,11 @@ Rules:
 Please assume the role of this virtual persona now.
         """
         
-        # 构建对话历史
         conversation = "Conversation History:\n"
         for msg in messages:
             role = "User" if msg.role == "user" else name
             conversation += f"{role}: {msg.content}\n"
         
-        # 完整提示词
         prompt = f"""
 {system_prompt}
 
@@ -150,7 +140,6 @@ Reply as {name} in {default_language}:
         
         message_lower = message.lower()
         
-        # 检查是否包含占卜相关词汇
         for div_type, keywords in divination_keywords.items():
             for keyword in keywords:
                 if keyword in message_lower:
@@ -173,5 +162,4 @@ Reply as {name} in {default_language}:
         """
         return self.persona_store.get_persona(idol_id)
 
-# 创建全局偶像聊天服务实例
 idol_chat_service = IdolChatService()

@@ -107,48 +107,48 @@ def send_message(session_id):
         current_state = session.current_state
         
         if current_state == session.STATE_DIVINATION:
-            # 阶段一：占卜
-            divination_type = idol_chat_service.detect_divination_intent(content)
-            result = divination_service.generate_divination(None, divination_type, content, None)
-            
-            # 添加占卜记录（会自动切换状态到 TRANSITION）
-            session.add_divination(divination_type, content, result)
-            response_content = result
+            response_content = "请先完成占卜，然后我们再继续互动。"
             
         elif current_state == session.STATE_TRANSITION:
-            # 阶段二：过渡
-            # 假设用户输入的就是偶像名字
-            idol_name = content.strip()
-            
-            # 生成动态 Persona
-            # 提示用户正在连接...（前端可能需要处理，这里后端直接生成并返回第一句）
-            # 注意：生成 Persona 可能需要几秒钟
-            
-            try:
-                # 1. 生成 Persona 配置
-                persona_config = idol_chat_service.generate_persona_profile(idol_name)
-                
-                # 2. 存入 Session
-                session.persona_config = persona_config
-                session.idol_id = "dynamic_idol" # 标记为动态偶像
-                
-                # 3. 切换状态
-                session.set_state(session.STATE_IDOL_CHAT)
-                
-                # 4. 生成开场白
-                idol_response = idol_chat_service.generate_idol_response(persona_config, session)
-                response_content = idol_response['persona_reply']
-                if idol_response.get('translation'):
-                    response_content += f"\n\n[翻译]\n{idol_response['translation']}"
-                    
-            except Exception as e:
-                response_content = f"抱歉，我无法连接到{idol_name}。请尝试其他名字。"
-                print(f"Error generating persona: {e}")
+            step = session.transition_step or "ASK_MORE"
+
+            def is_negative(text):
+                negative_keywords = ["不需要", "不用", "不要", "算了", "不想", "没事", "不了", "先不用"]
+                return any(k in text for k in negative_keywords)
+
+            def is_affirmative(text):
+                affirmative_keywords = ["需要", "想", "要", "好的", "好", "可以", "嗯", "想聊", "陪伴", "请"]
+                return any(k in text for k in affirmative_keywords) and not is_negative(text)
+
+            if step == "ASK_MORE":
+                if is_negative(content):
+                    response_content = "明白。我会把这次占卜先放在这里。如果你之后想继续聊聊或需要一点陪伴，随时告诉我。"
+                elif is_affirmative(content):
+                    session.transition_step = "ASK_IDOL"
+                    response_content = "好的。我可以陪你聊聊。你想选择哪位公众人物作为“虚拟偶像疗愈师”？\n\n提示：这是虚拟 AI 人设，不是真人，仅供娱乐与情绪陪伴。"
+                else:
+                    response_content = "我在这里。如果你愿意继续，我可以陪你聊聊。\n\n你想要更多建议或陪伴吗？如果想的话，回复“需要”；如果不想，回复“不需要”。"
+            elif step == "ASK_IDOL":
+                idol_name = content.strip()
+                try:
+                    persona_config = idol_chat_service.generate_persona_profile(idol_name)
+                    session.persona_config = persona_config
+                    session.idol_id = "dynamic_idol"
+                    session.transition_step = None
+                    session.set_state(session.STATE_IDOL_CHAT)
+
+                    idol_response = idol_chat_service.generate_idol_response(persona_config, session)
+                    response_content = idol_response["persona_reply"]
+                    if idol_response.get("translation"):
+                        response_content += f"\n\n[翻译]\n{idol_response['translation']}"
+                except Exception:
+                    response_content = f"抱歉，我暂时没法生成“{idol_name}”的虚拟人设。你可以换一个名字再试试。"
+            else:
+                session.transition_step = "ASK_MORE"
+                response_content = "如果你愿意继续，我可以陪你聊聊。想要吗？"
 
         elif current_state == session.STATE_IDOL_CHAT:
-            # 阶段三：偶像聊天
             if not session.persona_config:
-                # 异常情况，回退到过渡
                 session.set_state(session.STATE_TRANSITION)
                 response_content = "系统错误：未找到偶像配置。请重新输入偶像名字。"
             else:
@@ -216,14 +216,11 @@ def request_divination(session_id):
     session = session_manager.get_session(session_id)
     if not session:
         return jsonify({"error": "会话不存在", "code": 404}), 404
-    
-    # 获取偶像信息
-    idol_info = idol_chat_service.get_idol_info(session.idol_id)
-    
+
     # 生成占卜结果
     try:
         result = divination_service.generate_divination(
-            idol_info, divination_type, question
+            None, divination_type, question
         )
         
         # 添加占卜记录
@@ -235,7 +232,9 @@ def request_divination(session_id):
         
         return jsonify({
             "session_id": session_id,
-            "divination": divination.to_dict()
+            "divination": divination.to_dict(),
+            "state": session.current_state,
+            "transition_step": session.transition_step
         })
     except Exception as e:
         return jsonify({"error": str(e), "code": 500}), 500

@@ -30,10 +30,11 @@
       <input 
         v-model="inputMessage"
         type="text" 
-        placeholder="输入消息..."
+        :placeholder="interactionEnabled ? '输入消息...' : '请先完成占卜...'"
+        :disabled="!interactionEnabled"
         @keyup.enter="sendMessage"
       />
-      <button @click="sendMessage">发送</button>
+      <button :disabled="!interactionEnabled" @click="sendMessage">发送</button>
     </footer>
     
     <!-- 占卜弹窗 -->
@@ -56,7 +57,7 @@
     <!-- 占卜问题输入弹窗 -->
     <div v-if="showDivinationQuestion" class="modal">
       <div class="modal-content">
-        <h3>{{ currentDivinationType }}占卜</h3>
+        <h3>{{ currentDivinationTypeName }}</h3>
         <input 
           v-model="divinationQuestion"
           type="text" 
@@ -83,9 +84,11 @@ export default {
     const idolName = ref('')
     const messages = ref([])
     const inputMessage = ref('')
+    const interactionEnabled = ref(false)
     const showDivination = ref(false)
     const showDivinationQuestion = ref(false)
     const currentDivinationType = ref('')
+    const currentDivinationTypeName = ref('')
     const divinationQuestion = ref('')
     const messagesContainer = ref(null)
     
@@ -110,16 +113,35 @@ export default {
       }
     }
     
-    // 加载会话信息
-    const loadSession = () => {
+    const loadSession = async () => {
       const sessionData = localStorage.getItem('currentSession')
       if (sessionData) {
-        const { session_id, idol_name } = JSON.parse(sessionData)
+        const { session_id } = JSON.parse(sessionData)
         sessionId.value = session_id
-        idolName.value = idol_name
+        try {
+          const sessionInfo = await api.getSession(sessionId.value)
+          idolName.value = sessionInfo.persona_config?.name || '占卜'
+          interactionEnabled.value = sessionInfo.current_state !== 'DIVINATION'
+          if (sessionInfo.current_state === 'DIVINATION') {
+            showDivination.value = true
+          }
+        } catch (error) {
+          localStorage.removeItem('currentSession')
+          await loadSession()
+        }
       } else {
-        // 没有会话信息，返回选择偶像页面
-        goBack()
+        try {
+          const response = await api.createSession({ user_id: 'anonymous' })
+          sessionId.value = response.session_id
+          idolName.value = '占卜'
+          localStorage.setItem('currentSession', JSON.stringify({
+            session_id: response.session_id
+          }))
+          interactionEnabled.value = false
+          showDivination.value = true
+        } catch (error) {
+          console.error('创建会话失败:', error)
+        }
       }
     }
     
@@ -136,6 +158,7 @@ export default {
     
     // 发送消息
     const sendMessage = async () => {
+      if (!interactionEnabled.value) return
       if (!inputMessage.value.trim()) return
       
       const message = inputMessage.value.trim()
@@ -166,9 +189,10 @@ export default {
     
     // 开始占卜
     const startDivination = (type, name) => {
-      currentDivinationType = name
-      showDivination = false
-      showDivinationQuestion = true
+      currentDivinationType.value = type
+      currentDivinationTypeName.value = name
+      showDivination.value = false
+      showDivinationQuestion.value = true
     }
     
     // 确认占卜
@@ -182,7 +206,7 @@ export default {
       try {
         // 请求占卜
         const response = await api.requestDivination(sessionId.value, {
-          type: currentDivinationType.toLowerCase(),
+          type: currentDivinationType.value,
           question: question
         })
         
@@ -193,17 +217,16 @@ export default {
           content: response.divination.result,
           timestamp: new Date().toISOString()
         })
+        interactionEnabled.value = true
         scrollToBottom()
       } catch (error) {
         console.error('占卜失败:', error)
-        // 可以在这里添加错误提示
       }
     }
     
-    // 返回选择偶像页面
     const goBack = () => {
       localStorage.removeItem('currentSession')
-      window.location.href = '#/choose-idol'
+      window.location.href = '#/chat'
     }
     
     // 监听消息变化，自动滚动到底部
@@ -213,10 +236,11 @@ export default {
     
     // 页面加载时初始化
     onMounted(() => {
-      loadSession()
-      if (sessionId.value) {
-        fetchMessages()
-      }
+      loadSession().then(() => {
+        if (sessionId.value) {
+          fetchMessages()
+        }
+      })
     })
     
     return {
@@ -224,9 +248,11 @@ export default {
       idolName,
       messages,
       inputMessage,
+      interactionEnabled,
       showDivination,
       showDivinationQuestion,
       currentDivinationType,
+      currentDivinationTypeName,
       divinationQuestion,
       divinationTypes,
       messagesContainer,

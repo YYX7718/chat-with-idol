@@ -47,7 +47,8 @@ class ChatSession:
         self.updated_at = datetime.now().isoformat()
         self.messages = []
         self.divinations = []
-        self.persona_config = None  # Store dynamic persona configuration
+        self.persona_config = None
+        self.transition_step = None
         # 初始状态设置为占卜阶段
         self.current_state = self.STATE_DIVINATION
     
@@ -63,6 +64,7 @@ class ChatSession:
         self.updated_at = datetime.now().isoformat()
         # 占卜完成后自动切换到过渡阶段
         self.current_state = self.STATE_TRANSITION
+        self.transition_step = "ASK_MORE"
         return divination
 
     def set_state(self, state):
@@ -85,6 +87,7 @@ class ChatSession:
             "updated_at": self.updated_at,
             "current_state": self.current_state,
             "persona_config": self.persona_config,
+            "transition_step": self.transition_step,
             "messages": [msg.to_dict() for msg in self.messages]
         }
     

@@ -8,23 +8,20 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
-import ChooseIdol from './pages/choose-idol.vue'
 import IdolChat from './pages/idol-chat.vue'
 
-// 简单的 hash 路由：#/chat 切到聊天，其余回到选择页
 const route = ref(getRoute())
 
 const getComponent = {
-  home: ChooseIdol,
   chat: IdolChat
 }
 
-const currentComponent = computed(() => getComponent[route.value] || ChooseIdol)
+const currentComponent = computed(() => getComponent[route.value] || IdolChat)
 
 function getRoute() {
   const hash = window.location.hash || ''
   if (hash.startsWith('#/chat')) return 'chat'
-  return 'home'
+  return 'chat'
 }
 
 const onHashChange = () => {
