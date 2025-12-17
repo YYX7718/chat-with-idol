@@ -1,4 +1,7 @@
+import logging
 from .llm_client import llm_client
+
+logger = logging.getLogger(__name__)
 
 class DivinationService:
     def __init__(self):
@@ -14,8 +17,19 @@ class DivinationService:
         :return: 占卜结果
         """
         prompt = self._create_divination_prompt(idol_info, divination_type, question, user_emotion)
+        logger.info("divination_input type=%s question=%s", divination_type, str(question)[:500])
         result = self.llm_client.generate_response(prompt)
+        if not self._has_required_sections(result):
+            retry_prompt = prompt + "\n\n再次强调：输出必须包含且仅包含四个段落标题：【卦象与出处】【象意解读】【情绪安抚】【过渡询问】。"
+            result = self.llm_client.generate_response(retry_prompt, temperature=0.2)
+        logger.info("divination_output result=%s", str(result)[:1200])
         return result
+
+    def _has_required_sections(self, text):
+        if not text:
+            return False
+        required = ["【卦象与出处】", "【象意解读】", "【情绪安抚】", "【过渡询问】"]
+        return all(r in text for r in required)
     
     def _create_divination_prompt(self, idol_info, divination_type, question, user_emotion):
         """

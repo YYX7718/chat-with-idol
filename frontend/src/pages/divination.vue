@@ -31,7 +31,15 @@
     </main>
     
     <footer class="divination-footer">
-      <button class="new-divination-btn" @click="goNewDivination">新占卜</button>
+      <div class="new-divination-form">
+        <input
+          v-model="newQuestion"
+          type="text"
+          placeholder="输入要占卜的问题..."
+          @keyup.enter="submitDivination"
+        />
+        <button class="new-divination-btn" @click="submitDivination">占卜</button>
+      </div>
     </footer>
   </div>
 </template>
@@ -46,6 +54,7 @@ export default {
     const sessionId = ref('')
     const idolName = ref('')
     const divinations = ref([])
+    const newQuestion = ref('')
     
     // 占卜类型映射
     const divinationTypeMap = {
@@ -66,61 +75,77 @@ export default {
       return date.toLocaleString()
     }
     
-    // 加载会话信息
-    const loadSession = () => {
+    const loadSession = async () => {
       const sessionData = localStorage.getItem('currentSession')
       if (sessionData) {
-        const { session_id, idol_name } = JSON.parse(sessionData)
+        const { session_id } = JSON.parse(sessionData)
         sessionId.value = session_id
-        idolName.value = idol_name
+        try {
+          const sessionInfo = await api.getSession(sessionId.value)
+          idolName.value = sessionInfo.persona_config?.name || '占卜'
+        } catch (error) {
+          localStorage.removeItem('currentSession')
+          await loadSession()
+        }
       } else {
-        // 没有会话信息，返回选择偶像页面
-        goBackToChooseIdol()
+        try {
+          const response = await api.createSession({ user_id: 'anonymous' })
+          sessionId.value = response.session_id
+          idolName.value = '占卜'
+          localStorage.setItem('currentSession', JSON.stringify({
+            session_id: response.session_id
+          }))
+        } catch (error) {
+          console.error('创建会话失败:', error)
+        }
       }
     }
     
     // 获取占卜历史
     const fetchDivinations = async () => {
       try {
-        const response = await api.getDivinations(sessionId.value)
+        const response = await api.getDivinationHistory(sessionId.value)
         divinations.value = response.divinations
       } catch (error) {
         console.error('获取占卜历史失败:', error)
       }
     }
+
+    const submitDivination = async () => {
+      if (!newQuestion.value.trim()) return
+      const question = newQuestion.value.trim()
+      newQuestion.value = ''
+      try {
+        await api.sendMessage(sessionId.value, { content: question })
+        await fetchDivinations()
+      } catch (error) {
+        console.error('占卜请求失败:', error)
+      }
+    }
     
     // 返回聊天页面
     const goBack = () => {
-      window.location.href = '#/idol-chat'
-    }
-    
-    // 返回选择偶像页面
-    const goBackToChooseIdol = () => {
-      localStorage.removeItem('currentSession')
-      window.location.href = '#/choose-idol'
-    }
-    
-    // 新占卜
-    const goNewDivination = () => {
-      window.location.href = '#/idol-chat'
+      window.location.href = '#/chat'
     }
     
     // 页面加载时初始化
     onMounted(() => {
-      loadSession()
-      if (sessionId.value) {
-        fetchDivinations()
-      }
+      loadSession().then(() => {
+        if (sessionId.value) {
+          fetchDivinations()
+        }
+      })
     })
     
     return {
       sessionId,
       idolName,
       divinations,
+      newQuestion,
       formatTime,
       getDivinationTypeName,
       goBack,
-      goNewDivination
+      submitDivination
     }
   }
 }
@@ -228,8 +253,19 @@ export default {
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
 }
 
+.new-divination-form {
+  display: flex;
+  gap: 10px;
+}
+
+.new-divination-form input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 25px;
+}
+
 .new-divination-btn {
-  width: 100%;
   padding: 15px;
   background-color: #4CAF50;
   color: white;

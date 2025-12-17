@@ -1,4 +1,5 @@
 import os
+import logging
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from models.chat_session import SessionManager
@@ -9,6 +10,7 @@ from services.divination_service import divination_service
 # 如果存在 static 目录（Docker 部署），则使用它作为静态文件目录
 static_folder = 'static' if os.path.exists('static') else None
 app = Flask(__name__, static_folder=static_folder, static_url_path='')
+app.logger.setLevel(logging.INFO)
 
 # 配置 CORS（跨域资源共享）
 # 开发环境：允许所有来源（仅用于本地开发）
@@ -107,7 +109,12 @@ def send_message(session_id):
         current_state = session.current_state
         
         if current_state == session.STATE_DIVINATION:
-            response_content = "请先完成占卜，然后我们再继续互动。"
+            app.logger.info("DIVINATION input session=%s content=%s", session_id, content)
+            divination_type = idol_chat_service.detect_divination_intent(content)
+            result = divination_service.generate_divination(None, divination_type, content, None)
+            app.logger.info("DIVINATION output session=%s result=%s", session_id, str(result)[:800])
+            session.add_divination(divination_type, content, result)
+            response_content = result
             
         elif current_state == session.STATE_TRANSITION:
             step = session.transition_step or "ASK_MORE"

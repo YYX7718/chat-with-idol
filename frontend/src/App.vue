@@ -8,20 +8,23 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import Divination from './pages/divination.vue'
 import IdolChat from './pages/idol-chat.vue'
 
 const route = ref(getRoute())
 
 const getComponent = {
+  divination: Divination,
   chat: IdolChat
 }
 
-const currentComponent = computed(() => getComponent[route.value] || IdolChat)
+const currentComponent = computed(() => getComponent[route.value] || Divination)
 
 function getRoute() {
   const hash = window.location.hash || ''
   if (hash.startsWith('#/chat')) return 'chat'
-  return 'chat'
+  if (hash.startsWith('#/divination')) return 'divination'
+  return 'divination'
 }
 
 const onHashChange = () => {
