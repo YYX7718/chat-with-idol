@@ -21,44 +21,32 @@ class DivinationService:
         """
         创建占卜提示词
         """
-        # 占卜类型描述
-        type_descriptions = {
-            "love": "爱情",
-            "career": "事业",
-            "fortune": "运势",
-            "study": "学业"
-        }
-        
-        type_desc = type_descriptions.get(divination_type, divination_type)
-        
-        # 情绪描述
-        emotion_desc = f"情绪{user_emotion}" if user_emotion else ""
-        
-        # 构建提示词
         prompt = f"""
-你是一位名叫{idol_info['name']}的虚拟偶像，{idol_info['personality']}。
-你的语言风格：{idol_info['language_style']}。
-
-现在你需要为用户提供{type_desc}占卜服务。
-
+你是一位精通梅花易数的占卜师。
 用户的问题是："{question}"
-用户的当前状态：{emotion_desc}
-占卜的类型：{type_desc}运势
+用户的情绪（可选）：{user_emotion if user_emotion else "未知"}
+占卜类型：{divination_type if divination_type else "通用"}
 
-请你为用户提供一个符合你角色设定的占卜结果，要求：
-1. 使用符合你性格的语言风格
-2. 结合用户的问题和情绪状态
-3. 保持积极正面的基调
-4. 语言要生动形象，富有情感
-5. 结果长度适中，避免过于冗长
-6. 可以加入一些与你的角色相关的元素或比喻
+请严格按照以下格式输出（不要输出其他无关内容）：
 
-输出格式：
-{idol_info['name']}的{type_desc}占卜：
+【卦象与出处】
+卦名
+至少一句真实古籍原文（如卦辞 / 象传）
 
-[占卜结果内容]
+【象意解读】
+现代语言解释
+不使用绝对判断
 
-[鼓励性结尾]
+【情绪安抚】
+缓解焦虑
+强调过程而非结果
+
+【过渡询问】
+明确询问是否需要进一步建议或陪伴
+
+❌ 禁止行为
+不得预测具体结果（如成败、时间）
+不得使用“必然、注定、灾难”等词
         """
         
         return prompt.strip()

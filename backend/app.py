@@ -52,12 +52,10 @@ def create_session():
     idol_id = data.get('idol_id')
     user_id = data.get('user_id')
     
-    if not idol_id:
-        return jsonify({"error": "缺少偶像ID", "code": 400}), 400
-    
-    # 验证偶像是否存在
-    if not idol_chat_service.get_idol_info(idol_id):
-        return jsonify({"error": "偶像不存在", "code": 404}), 404
+    # 如果提供了idol_id，验证是否存在
+    if idol_id:
+        if not idol_chat_service.get_idol_info(idol_id):
+            return jsonify({"error": "偶像不存在", "code": 404}), 404
     
     session = session_manager.create_session(idol_id, user_id)
     return jsonify(session.to_dict()), 201
@@ -88,7 +86,7 @@ def delete_session(session_id):
 @app.route(f'{api_prefix}/chat/<session_id>', methods=['POST'])
 def send_message(session_id):
     """
-    发送聊天消息
+    发送聊天消息，处理不同阶段的逻辑
     """
     data = request.get_json()
     content = data.get('content')
@@ -104,19 +102,73 @@ def send_message(session_id):
     # 添加用户消息
     session.add_message("user", content)
     
-    # 获取偶像信息
-    idol_info = idol_chat_service.get_idol_info(session.idol_id)
-    
-    # 生成偶像回复
     try:
-        idol_response = idol_chat_service.generate_idol_response(idol_info, session)
-        # 添加偶像消息
-        idol_message = session.add_message("idol", idol_response)
+        response_content = ""
+        current_state = session.current_state
+        
+        if current_state == session.STATE_DIVINATION:
+            # 阶段一：占卜
+            divination_type = idol_chat_service.detect_divination_intent(content)
+            result = divination_service.generate_divination(None, divination_type, content, None)
+            
+            # 添加占卜记录（会自动切换状态到 TRANSITION）
+            session.add_divination(divination_type, content, result)
+            response_content = result
+            
+        elif current_state == session.STATE_TRANSITION:
+            # 阶段二：过渡
+            # 假设用户输入的就是偶像名字
+            idol_name = content.strip()
+            
+            # 生成动态 Persona
+            # 提示用户正在连接...（前端可能需要处理，这里后端直接生成并返回第一句）
+            # 注意：生成 Persona 可能需要几秒钟
+            
+            try:
+                # 1. 生成 Persona 配置
+                persona_config = idol_chat_service.generate_persona_profile(idol_name)
+                
+                # 2. 存入 Session
+                session.persona_config = persona_config
+                session.idol_id = "dynamic_idol" # 标记为动态偶像
+                
+                # 3. 切换状态
+                session.set_state(session.STATE_IDOL_CHAT)
+                
+                # 4. 生成开场白
+                idol_response = idol_chat_service.generate_idol_response(persona_config, session)
+                response_content = idol_response['persona_reply']
+                if idol_response.get('translation'):
+                    response_content += f"\n\n[翻译]\n{idol_response['translation']}"
+                    
+            except Exception as e:
+                response_content = f"抱歉，我无法连接到{idol_name}。请尝试其他名字。"
+                print(f"Error generating persona: {e}")
+
+        elif current_state == session.STATE_IDOL_CHAT:
+            # 阶段三：偶像聊天
+            if not session.persona_config:
+                # 异常情况，回退到过渡
+                session.set_state(session.STATE_TRANSITION)
+                response_content = "系统错误：未找到偶像配置。请重新输入偶像名字。"
+            else:
+                idol_info = session.persona_config
+                idol_response = idol_chat_service.generate_idol_response(idol_info, session)
+                response_content = idol_response['persona_reply']
+                if idol_response.get('translation'):
+                    response_content += f"\n\n[翻译]\n{idol_response['translation']}"
+
+        # 添加系统/偶像消息
+        idol_message = session.add_message("idol", response_content)
         return jsonify({
             "session_id": session_id,
-            "message": idol_message.to_dict()
+            "message": idol_message.to_dict(),
+            "state": session.current_state # 返回当前状态方便前端处理
         })
+        
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e), "code": 500}), 500
 
 # 获取消息历史

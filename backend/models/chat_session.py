@@ -39,7 +39,7 @@ class ChatSession:
     STATE_TRANSITION = "TRANSITION"
     STATE_IDOL_CHAT = "IDOL_CHAT"
 
-    def __init__(self, idol_id, user_id=None):
+    def __init__(self, idol_id=None, user_id=None):
         self.session_id = str(uuid.uuid4())
         self.idol_id = idol_id
         self.user_id = user_id
@@ -47,6 +47,7 @@ class ChatSession:
         self.updated_at = datetime.now().isoformat()
         self.messages = []
         self.divinations = []
+        self.persona_config = None  # Store dynamic persona configuration
         # 初始状态设置为占卜阶段
         self.current_state = self.STATE_DIVINATION
     
@@ -83,6 +84,7 @@ class ChatSession:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "current_state": self.current_state,
+            "persona_config": self.persona_config,
             "messages": [msg.to_dict() for msg in self.messages]
         }
     
@@ -94,7 +96,7 @@ class SessionManager:
     def __init__(self):
         self.sessions = {}
     
-    def create_session(self, idol_id, user_id=None):
+    def create_session(self, idol_id=None, user_id=None):
         session = ChatSession(idol_id, user_id)
         self.sessions[session.session_id] = session
         return session

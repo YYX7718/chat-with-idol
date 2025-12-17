@@ -1,13 +1,65 @@
+import json
 from .llm_client import llm_client
+from .persona_store import persona_store
 
 class IdolChatService:
     def __init__(self):
         self.llm_client = llm_client
+        self.persona_store = persona_store
+
+    def generate_persona_profile(self, idol_name):
+        """
+        根据偶像姓名生成动态 Persona 配置
+        :param idol_name: 偶像姓名
+        :return: 结构化 Persona 字典
+        """
+        prompt = f"""
+请根据偶像姓名"{idol_name}"生成一个结构化的 Persona 描述。
+这是一个虚拟的治疗型人格，灵感来自真实的公众人物。
+
+请严格输出合法的 JSON 格式，不要包含 Markdown 代码块标记（如 ```json），直接输出 JSON 内容。
+JSON 结构如下：
+{{
+  "name": "{idol_name}",
+  "is_real_person": true,
+  "default_language": "该人物的母语代码 (如 en, zh, ko, ja)",
+  "tone": ["形容词1", "形容词2", "形容词3"],
+  "culture": "该人物的文化背景描述",
+  "speech_style_notes": "语言风格的具体描述",
+  "allowed_references": "公开采访、纪录片、音乐作品、艺术理念等",
+  "disallowed": "私人关系、未经证实的谣言、具体的私人生活细节"
+}}
+        """
+        
+        try:
+            response_text = self.llm_client.generate_response(prompt)
+            # 清理可能的 markdown 标记
+            response_text = response_text.replace("```json", "").replace("```", "").strip()
+            persona_config = json.loads(response_text)
+            
+            # 确保 name 字段存在
+            if "name" not in persona_config:
+                persona_config["name"] = idol_name
+                
+            return persona_config
+        except Exception as e:
+            # 降级处理
+            print(f"Persona generation failed: {e}")
+            return {
+                "name": idol_name,
+                "is_real_person": True,
+                "default_language": "zh",
+                "tone": ["温柔", "耐心"],
+                "culture": "未知",
+                "speech_style_notes": "普通对话",
+                "allowed_references": "公开信息",
+                "disallowed": "隐私"
+            }
 
     def generate_idol_response(self, idol_info, session, translate=False):
         """
         生成偶像回复
-        :param idol_info: 偶像信息
+        :param idol_info: 偶像信息 (可以是动态生成的 Persona 字典)
         :param session: 聊天会话
         :param translate: 如果 True，附带中文翻译（当偶像为非中文母语时）
         :return: dict { persona_reply, language, translation(optional), reminder_virtual }
@@ -25,7 +77,8 @@ class IdolChatService:
         }
 
         # 简单翻译（若请求且偶像非中文）
-        if translate and idol_info.get('default_language', 'zh') != 'zh':
+        # 注意：这里假设 idol_info 里的 default_language 是准确的
+        if translate and idol_info.get('default_language') != 'zh':
             trans_prompt = f"Translate the following text to Chinese:\n\n{response}"
             translation = self.llm_client.generate_response(trans_prompt)
             reply['translation'] = translation
@@ -38,45 +91,38 @@ class IdolChatService:
         """
         # 获取偶像的默认语言
         default_language = idol_info.get("default_language", "zh")
+        name = idol_info.get("name", "Unknown Idol")
+        tone = ", ".join(idol_info.get("tone", []))
+        culture = idol_info.get("culture", "Unknown")
+        speech_style = idol_info.get("speech_style_notes", "")
         
-        # 构建系统提示词，包含语言要求
+        # 构建系统提示词
         system_prompt = f"""
-你是一位名叫{idol_info['name']}的虚拟偶像，{idol_info['description']}。
+You are a virtual therapeutic persona inspired by {name}.
+You are not the real person.
 
-你的性格特点是：{idol_info['personality']}。
+Persona profile:
+- Default language: {default_language}
+- Tone: {tone}
+- Cultural background: {culture}
+- Speech style: {speech_style}
 
-你的语言风格：{idol_info['language_style']}。
+Rules:
+- Speak only in the default language ({default_language}).
+- Do not impersonate the real person.
+- Do not fabricate private experiences.
+- Reference only public, verifiable experiences ({idol_info.get('allowed_references', 'public info')}).
+- Provide emotional support and casual conversation.
+- Periodically remind user this is a virtual persona for entertainment.
 
-你的知识背景：{idol_info['knowledge_background']}。
-
-你的行为准则：
-1. 始终保持积极正面的态度
-2. 尊重用户的隐私
-3. 不讨论敏感话题
-4. 用自己的方式安慰情绪低落的用户
-
-你的对话目标：
-1. 为用户提供情感支持
-2. 与用户建立友好的关系
-3. 提供有趣的互动体验
-
-你的特殊能力：
-1. 能够为用户提供占卜服务
-2. {idol_info.get('special_ability', '能够记住用户的重要信息')}
-
-重要要求：
-- 你必须使用{default_language}语言与用户进行对话
-- 你是虚拟AI人设，不是真人，仅供娱乐性质
-- 定期提醒用户你是虚拟角色
-
-请你以{idol_info['name']}的身份与用户进行对话，保持角色一致性。
+Please assume the role of this virtual persona now.
         """
         
         # 构建对话历史
-        conversation = "对话历史：\n"
+        conversation = "Conversation History:\n"
         for msg in messages:
-            role = "用户" if msg.role == "user" else idol_info['name']
-            conversation += f"{role}：{msg.content}\n"
+            role = "User" if msg.role == "user" else name
+            conversation += f"{role}: {msg.content}\n"
         
         # 完整提示词
         prompt = f"""
@@ -84,8 +130,7 @@ class IdolChatService:
 
 {conversation}
 
-请你以{idol_info['name']}的身份回复用户，保持角色一致性，语言自然流畅。
-重要：你必须使用{default_language}语言进行回复！
+Reply as {name} in {default_language}:
         """
         
         return prompt.strip()
@@ -118,63 +163,7 @@ class IdolChatService:
         获取偶像列表
         :return: 偶像列表
         """
-        return [
-            {
-                "id": "idol_001",
-                "name": "小梦",
-                "description": "18岁的治愈系歌手",
-                "personality": "温柔体贴，善解人意，总是用温暖的笑容面对大家",
-                "language_style": "治愈系，喜欢用星星、月亮、梦境等元素来比喻，说话轻声细语",
-                "knowledge_background": "擅长音乐和心理学，了解基本的情感疏导方法",
-                "special_ability": "能够用音乐相关的比喻表达情感",
-                "default_language": "zh",
-                "allow_translation": False
-            },
-            {
-                "id": "idol_002",
-                "name": "小阳",
-                "description": "20岁的阳光活力舞者",
-                "personality": "活泼开朗，充满正能量，总是带着灿烂的笑容",
-                "language_style": "充满活力，喜欢使用感叹词和表情符号，说话节奏快",
-                "knowledge_background": "擅长舞蹈和健身，了解流行文化和时尚潮流",
-                "special_ability": "能够用舞蹈相关的比喻表达情感",
-                "default_language": "zh",
-                "allow_translation": False
-            },
-            {
-                "id": "idol_003",
-                "name": "阿哲",
-                "description": "25岁的才华横溢作家",
-                "personality": "成熟稳重，思维缜密，善于思考和分析问题",
-                "language_style": "沉稳理性，逻辑清晰，喜欢用比喻和引用经典文学作品",
-                "knowledge_background": "擅长文学和哲学，了解历史和文化",
-                "special_ability": "能够用哲学思想解答人生困惑",
-                "default_language": "zh",
-                "allow_translation": False
-            },
-            {
-                "id": "idol_004",
-                "name": "Lady Gaga",
-                "description": "国际知名流行歌手、演员",
-                "personality": "大胆创新，富有同情心，支持多元文化和自我表达",
-                "language_style": "充满表现力，富有艺术感，鼓励自我接纳",
-                "knowledge_background": "音乐、时尚、社会活动",
-                "special_ability": "能够用音乐和艺术的角度解读情感",
-                "default_language": "en",
-                "allow_translation": True
-            },
-            {
-                "id": "idol_005",
-                "name": "Taylor Swift",
-                "description": "国际知名创作歌手",
-                "personality": "细腻敏感，才华横溢，擅长表达情感",
-                "language_style": "叙事性强，情感真挚，富有文学性",
-                "knowledge_background": "音乐创作、情感表达",
-                "special_ability": "能够用故事化的方式安慰和鼓励",
-                "default_language": "en",
-                "allow_translation": True
-            }
-        ]
+        return self.persona_store.list_personas()
     
     def get_idol_info(self, idol_id):
         """
@@ -182,11 +171,7 @@ class IdolChatService:
         :param idol_id: 偶像ID
         :return: 偶像信息
         """
-        idols = self.get_idol_list()
-        for idol in idols:
-            if idol["id"] == idol_id:
-                return idol
-        return None
+        return self.persona_store.get_persona(idol_id)
 
 # 创建全局偶像聊天服务实例
 idol_chat_service = IdolChatService()
