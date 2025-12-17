@@ -110,11 +110,13 @@ def send_message(session_id):
         
         if current_state == session.STATE_DIVINATION:
             app.logger.info("DIVINATION input session=%s content=%s", session_id, content)
-            divination_type = idol_chat_service.detect_divination_intent(content)
+            divination_type = idol_chat_service.detect_divination_intent(content) or "general"
             result = divination_service.generate_divination(None, divination_type, content, None)
             app.logger.info("DIVINATION output session=%s result=%s", session_id, str(result)[:800])
             session.add_divination(divination_type, content, result)
-            response_content = result
+            session.set_state(session.STATE_TRANSITION)
+            session.transition_step = "ASK_MORE"
+            response_content = result + "\n\n如果你愿意，我也可以再陪你聊聊。你需要更多建议或陪伴吗？"
             
         elif current_state == session.STATE_TRANSITION:
             step = session.transition_step or "ASK_MORE"
@@ -226,12 +228,18 @@ def request_divination(session_id):
 
     # 生成占卜结果
     try:
+        was_divination = session.current_state == session.STATE_DIVINATION
+        app.logger.info("/divination input session=%s type=%s question=%s", session_id, divination_type, str(question)[:500])
         result = divination_service.generate_divination(
             None, divination_type, question
         )
+        app.logger.info("/divination output session=%s result=%s", session_id, str(result)[:800])
         
         # 添加占卜记录
         divination = session.add_divination(divination_type, question, result)
+        if was_divination:
+            session.set_state(session.STATE_TRANSITION)
+            session.transition_step = "ASK_MORE"
         
         # 同时添加到消息历史
         session.add_message("user", f"请求{divination_type}占卜：{question}")

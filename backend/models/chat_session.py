@@ -62,9 +62,9 @@ class ChatSession:
         divination = Divination(divination_type, question, result)
         self.divinations.append(divination)
         self.updated_at = datetime.now().isoformat()
-        # 占卜完成后自动切换到过渡阶段
-        self.current_state = self.STATE_TRANSITION
-        self.transition_step = "ASK_MORE"
+        if self.current_state == self.STATE_DIVINATION:
+            self.current_state = self.STATE_TRANSITION
+            self.transition_step = "ASK_MORE"
         return divination
 
     def set_state(self, state):
