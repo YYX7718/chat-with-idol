@@ -231,7 +231,7 @@ def request_divination(session_id):
         was_divination = session.current_state == session.STATE_DIVINATION
         app.logger.info("/divination input session=%s type=%s question=%s", session_id, divination_type, str(question)[:500])
         result = divination_service.generate_divination(
-            None, divination_type, question
+            None, divination_type, question, None
         )
         app.logger.info("/divination output session=%s result=%s", session_id, str(result)[:800])
         

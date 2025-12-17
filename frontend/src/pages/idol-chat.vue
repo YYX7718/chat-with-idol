@@ -1,10 +1,15 @@
 <template>
   <div class="chat-container">
     <header class="chat-header">
-      <h2>{{ idolName }}</h2>
+      <div class="header-left">
+        <div class="title-group">
+          <h2 class="title">{{ idolName }}</h2>
+          <div class="subtitle">{{ interactionEnabled ? '陪伴聊天' : '占卜进行中' }}</div>
+        </div>
+      </div>
       <div class="header-actions">
-        <button class="divination-btn" @click="showDivination = true">占卜</button>
-        <button class="back-btn" @click="goBack">返回</button>
+        <button class="ghost-btn" :disabled="busy" @click="showDivination = true">占卜</button>
+        <button class="danger-btn" :disabled="busy" @click="goBack">重置</button>
       </div>
     </header>
     
@@ -27,14 +32,19 @@
     </main>
     
     <footer class="chat-footer">
-      <input 
-        v-model="inputMessage"
-        type="text" 
-        :placeholder="interactionEnabled ? '输入消息...' : '请先完成占卜...'"
-        :disabled="!interactionEnabled"
-        @keyup.enter="sendMessage"
-      />
-      <button :disabled="!interactionEnabled" @click="sendMessage">发送</button>
+      <div class="composer">
+        <input 
+          v-model="inputMessage"
+          class="composer-input"
+          type="text" 
+          :placeholder="interactionEnabled ? '输入消息...' : '请先完成占卜...'"
+          :disabled="!interactionEnabled || busy"
+          @keyup.enter="sendMessage"
+        />
+        <button class="primary-btn" :disabled="!interactionEnabled || busy" @click="sendMessage">
+          {{ busy ? '发送中...' : '发送' }}
+        </button>
+      </div>
     </footer>
     
     <!-- 占卜弹窗 -->
@@ -50,7 +60,7 @@
             {{ type.name }}
           </button>
         </div>
-        <button class="close-btn" @click="showDivination = false">关闭</button>
+        <button class="close-btn" :disabled="busy" @click="showDivination = false">关闭</button>
       </div>
     </div>
     
@@ -61,14 +71,22 @@
         <input 
           v-model="divinationQuestion"
           type="text" 
-          placeholder="请输入您的问题..."
+          class="modal-input"
+          placeholder="请输入你的问题..."
+          :disabled="busy"
           @keyup.enter="confirmDivination"
         />
         <div class="modal-actions">
-          <button @click="confirmDivination">确认</button>
-          <button @click="showDivinationQuestion = false">取消</button>
+          <button class="primary-btn" :disabled="busy" @click="confirmDivination">
+            {{ busy ? '占卜中...' : '确认' }}
+          </button>
+          <button class="ghost-btn" :disabled="busy" @click="showDivinationQuestion = false">取消</button>
         </div>
       </div>
+    </div>
+
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      {{ toast.text }}
     </div>
   </div>
 </template>
@@ -91,6 +109,13 @@ export default {
     const currentDivinationTypeName = ref('')
     const divinationQuestion = ref('')
     const messagesContainer = ref(null)
+    const busy = ref(false)
+    const toast = ref({ show: false, text: '', type: 'info' })
+
+    const showToast = (text, type = 'info') => {
+      toast.value = { show: true, text, type }
+      setTimeout(() => (toast.value.show = false), 2500)
+    }
     
     // 占卜类型
     const divinationTypes = [
@@ -160,6 +185,7 @@ export default {
     const sendMessage = async () => {
       if (!interactionEnabled.value) return
       if (!inputMessage.value.trim()) return
+      if (busy.value) return
       
       const message = inputMessage.value.trim()
       inputMessage.value = ''
@@ -175,6 +201,7 @@ export default {
       scrollToBottom()
       
       try {
+        busy.value = true
         // 发送消息到服务器
         const response = await api.sendMessage(sessionId.value, { content: message })
         
@@ -182,9 +209,9 @@ export default {
         messages.value.push(response.message)
         scrollToBottom()
       } catch (error) {
-        console.error('发送消息失败:', error)
-        // 可以在这里添加错误提示
+        showToast('发送失败，请稍后重试', 'error')
       }
+      busy.value = false
     }
     
     // 开始占卜
@@ -198,30 +225,31 @@ export default {
     // 确认占卜
     const confirmDivination = async () => {
       if (!divinationQuestion.value.trim()) return
+      if (busy.value) return
+      if (!currentDivinationType.value) {
+        showToast('请先选择占卜类型', 'error')
+        return
+      }
       
       const question = divinationQuestion.value.trim()
       divinationQuestion.value = ''
-      showDivinationQuestion = false
+      showDivinationQuestion.value = false
       
       try {
+        busy.value = true
         // 请求占卜
         const response = await api.requestDivination(sessionId.value, {
           type: currentDivinationType.value,
           question: question
         })
         
-        // 添加占卜结果到消息列表
-        messages.value.push({
-          id: Date.now().toString(),
-          role: 'idol',
-          content: response.divination.result,
-          timestamp: new Date().toISOString()
-        })
-        interactionEnabled.value = true
-        scrollToBottom()
+        interactionEnabled.value = response.state !== 'DIVINATION'
+        await fetchMessages()
+        showToast('占卜完成', 'success')
       } catch (error) {
-        console.error('占卜失败:', error)
+        showToast('占卜失败，请稍后重试', 'error')
       }
+      busy.value = false
     }
     
     const goBack = () => {
@@ -256,6 +284,8 @@ export default {
       divinationQuestion,
       divinationTypes,
       messagesContainer,
+      busy,
+      toast,
       formatTime,
       sendMessage,
       startDivination,
@@ -271,17 +301,38 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(99, 102, 241, 0.20), transparent 60%),
+    radial-gradient(900px 500px at 90% 20%, rgba(16, 185, 129, 0.18), transparent 55%),
+    radial-gradient(900px 600px at 20% 90%, rgba(236, 72, 153, 0.14), transparent 60%),
+    linear-gradient(135deg, #f5f7ff 0%, #f8fafc 55%, #f2f7ff 100%);
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background-color: #4CAF50;
-  color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #0f172a;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.65);
 }
 
 .header-actions {
@@ -289,22 +340,48 @@ export default {
   gap: 10px;
 }
 
-.divination-btn, .back-btn {
-  padding: 8px 15px;
-  border: none;
-  border-radius: 5px;
+.primary-btn,
+.ghost-btn,
+.danger-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
   cursor: pointer;
-  font-weight: bold;
+  transition: transform 0.06s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 
-.divination-btn {
-  background-color: #ffeb3b;
-  color: #333;
+.primary-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.26);
 }
 
-.back-btn {
-  background-color: #f44336;
-  color: white;
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.75);
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+.danger-btn {
+  background: rgba(239, 68, 68, 0.10);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.20);
+}
+
+.primary-btn:active,
+.ghost-btn:active,
+.danger-btn:active {
+  transform: translateY(1px);
+}
+
+.primary-btn:disabled,
+.ghost-btn:disabled,
+.danger-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
 }
 
 .chat-main {
@@ -315,32 +392,37 @@ export default {
 .messages-container {
   height: 100%;
   overflow-y: auto;
-  padding: 20px;
+  padding: 18px 14px 26px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
 }
 
 .message {
-  max-width: 70%;
-  padding: 12px 15px;
-  border-radius: 15px;
+  max-width: min(78%, 720px);
+  padding: 12px 14px;
+  border-radius: 18px;
   position: relative;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message.user {
   align-self: flex-end;
-  background-color: #4CAF50;
-  color: white;
-  border-bottom-right-radius: 5px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  border-bottom-right-radius: 6px;
+  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.20);
 }
 
 .message.idol {
   align-self: flex-start;
-  background-color: white;
-  color: #333;
-  border: 1px solid #e0e0e0;
-  border-bottom-left-radius: 5px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom-left-radius: 6px;
+  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
 }
 
 .message-time {
@@ -352,28 +434,33 @@ export default {
 
 .chat-footer {
   display: flex;
-  padding: 15px 20px;
-  background-color: white;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+  padding: 14px 14px 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.composer {
+  width: 100%;
+  display: flex;
   gap: 10px;
+  align-items: center;
 }
 
-.chat-footer input {
+.composer-input {
   flex: 1;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 25px;
-  font-size: 1rem;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
-.chat-footer button {
-  padding: 12px 20px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 1rem;
+.composer-input:focus {
+  border-color: rgba(79, 70, 229, 0.35);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14);
 }
 
 /* 弹窗样式 */
@@ -383,55 +470,64 @@ export default {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(2, 6, 23, 0.48);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal-content {
-  background-color: white;
-  padding: 30px;
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  padding: 22px;
+  border-radius: 16px;
   width: 90%;
   max-width: 400px;
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.22);
+  backdrop-filter: blur(12px);
 }
 
 .modal-content h3 {
   text-align: center;
-  margin-bottom: 20px;
-  color: #333;
+  margin-bottom: 16px;
+  color: #0f172a;
+  font-weight: 800;
 }
 
 .divination-types {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .divination-types button {
-  padding: 15px;
-  border: none;
-  border-radius: 5px;
-  background-color: #f0f0f0;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  font-size: 1rem;
-  transition: background-color 0.3s;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  transition: transform 0.06s ease, box-shadow 0.12s ease, border-color 0.12s ease;
 }
 
 .divination-types button:hover {
-  background-color: #e0e0e0;
+  border-color: rgba(79, 70, 229, 0.25);
+  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.10);
 }
 
 .modal-content input {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-size: 1rem;
-  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .modal-actions {
@@ -440,32 +536,41 @@ export default {
   justify-content: center;
 }
 
-.modal-actions button {
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.modal-actions button:first-child {
-  background-color: #4CAF50;
-  color: white;
-}
-
-.modal-actions button:last-child {
-  background-color: #f44336;
-  color: white;
-}
-
 .close-btn {
   width: 100%;
-  padding: 10px;
+  padding: 10px 12px;
   border: none;
-  border-radius: 5px;
-  background-color: #f44336;
-  color: white;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.10);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.20);
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  z-index: 1200;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.toast.success {
+  border-color: rgba(16, 185, 129, 0.30);
+}
+
+.toast.error {
+  border-color: rgba(239, 68, 68, 0.30);
 }
 </style>

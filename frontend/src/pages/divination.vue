@@ -1,46 +1,70 @@
 <template>
   <div class="divination-container">
     <header class="divination-header">
-      <h2>{{ idolName }}</h2>
-      <button class="back-btn" @click="goBack">返回聊天</button>
+      <div class="header-left">
+        <h2 class="title">{{ idolName || '占卜' }}</h2>
+        <div class="subtitle">先占卜，再选择公众人物生成虚拟偶像陪伴聊天</div>
+      </div>
+      <div class="header-actions">
+        <button class="ghost-btn" :disabled="busy" @click="goChat">进入聊天</button>
+      </div>
     </header>
     
     <main class="divination-main">
-      <div class="divination-history">
-        <h3>占卜历史</h3>
-        <div v-if="divinations.length === 0" class="empty-state">
-          暂无占卜记录
-        </div>
-        <div 
-          v-for="divination in divinations" 
-          :key="divination.id"
-          class="divination-item"
-        >
-          <div class="divination-header-info">
-            <span class="divination-type">{{ getDivinationTypeName(divination.type) }}</span>
-            <span class="divination-time">{{ formatTime(divination.timestamp) }}</span>
+      <div class="content">
+        <section class="card">
+          <div class="card-title">开始占卜</div>
+          <div class="type-row">
+            <button
+              v-for="type in divinationTypes"
+              :key="type.value"
+              class="type-chip"
+              :class="{ active: selectedType === type.value }"
+              :disabled="busy"
+              @click="selectedType = type.value"
+            >
+              {{ type.name }}
+            </button>
           </div>
-          <div class="divination-question">
-            <strong>问题:</strong> {{ divination.question }}
+          <textarea
+            v-model="newQuestion"
+            class="question-input"
+            :disabled="busy"
+            rows="3"
+            placeholder="输入你想占卜的问题…"
+            @keyup.enter.exact.prevent="submitDivination"
+          />
+          <div class="actions">
+            <button class="primary-btn" :disabled="busy || !newQuestion.trim()" @click="submitDivination">
+              {{ busy ? '占卜中…' : '开始占卜' }}
+            </button>
           </div>
-          <div class="divination-result">
-            <strong>结果:</strong> {{ divination.result }}
+        </section>
+
+        <section class="card history">
+          <div class="card-title">占卜记录</div>
+          <div v-if="divinations.length === 0" class="empty-state">
+            暂无占卜记录
           </div>
-        </div>
+          <div
+            v-for="divination in divinations"
+            :key="divination.id"
+            class="divination-item"
+          >
+            <div class="divination-header-info">
+              <span class="divination-type">{{ getDivinationTypeName(divination.type) }}</span>
+              <span class="divination-time">{{ formatTime(divination.timestamp) }}</span>
+            </div>
+            <div class="divination-question">{{ divination.question }}</div>
+            <div class="divination-result">{{ divination.result }}</div>
+          </div>
+        </section>
       </div>
     </main>
-    
-    <footer class="divination-footer">
-      <div class="new-divination-form">
-        <input
-          v-model="newQuestion"
-          type="text"
-          placeholder="输入要占卜的问题..."
-          @keyup.enter="submitDivination"
-        />
-        <button class="new-divination-btn" @click="submitDivination">占卜</button>
-      </div>
-    </footer>
+
+    <div v-if="toast.show" class="toast" :class="toast.type">
+      {{ toast.text }}
+    </div>
   </div>
 </template>
 
@@ -55,6 +79,21 @@ export default {
     const idolName = ref('')
     const divinations = ref([])
     const newQuestion = ref('')
+    const selectedType = ref('love')
+    const busy = ref(false)
+    const toast = ref({ show: false, text: '', type: 'info' })
+
+    const divinationTypes = [
+      { value: 'love', name: '爱情' },
+      { value: 'career', name: '事业' },
+      { value: 'fortune', name: '运势' },
+      { value: 'study', name: '学业' }
+    ]
+
+    const showToast = (text, type = 'info') => {
+      toast.value = { show: true, text, type }
+      setTimeout(() => (toast.value.show = false), 2500)
+    }
     
     // 占卜类型映射
     const divinationTypeMap = {
@@ -96,7 +135,7 @@ export default {
             session_id: response.session_id
           }))
         } catch (error) {
-          console.error('创建会话失败:', error)
+          showToast('创建会话失败，请刷新重试', 'error')
         }
       }
     }
@@ -107,24 +146,34 @@ export default {
         const response = await api.getDivinationHistory(sessionId.value)
         divinations.value = response.divinations
       } catch (error) {
-        console.error('获取占卜历史失败:', error)
+        showToast('获取占卜记录失败，请稍后重试', 'error')
       }
     }
 
     const submitDivination = async () => {
+      if (busy.value) return
       if (!newQuestion.value.trim()) return
       const question = newQuestion.value.trim()
       newQuestion.value = ''
       try {
-        await api.sendMessage(sessionId.value, { content: question })
+        busy.value = true
+        await api.requestDivination(sessionId.value, {
+          type: selectedType.value,
+          question
+        })
         await fetchDivinations()
+        showToast('占卜完成，进入聊天…', 'success')
+        setTimeout(() => {
+          window.location.href = '#/chat'
+        }, 350)
       } catch (error) {
-        console.error('占卜请求失败:', error)
+        showToast('占卜请求失败，请稍后重试', 'error')
       }
+      busy.value = false
     }
     
     // 返回聊天页面
-    const goBack = () => {
+    const goChat = () => {
       window.location.href = '#/chat'
     }
     
@@ -144,7 +193,11 @@ export default {
       newQuestion,
       formatTime,
       getDivinationTypeName,
-      goBack,
+      divinationTypes,
+      selectedType,
+      busy,
+      toast,
+      goChat,
       submitDivination
     }
   }
@@ -156,123 +209,240 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #f5f5f5;
+  background: radial-gradient(1200px 600px at 10% 10%, rgba(99, 102, 241, 0.20), transparent 60%),
+    radial-gradient(900px 500px at 90% 20%, rgba(16, 185, 129, 0.18), transparent 55%),
+    radial-gradient(900px 600px at 20% 90%, rgba(236, 72, 153, 0.14), transparent 60%),
+    linear-gradient(135deg, #f5f7ff 0%, #f8fafc 55%, #f2f7ff 100%);
 }
 
 .divination-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 15px 20px;
-  background-color: #4CAF50;
-  color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
 }
 
-.back-btn {
-  padding: 8px 15px;
-  background-color: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: bold;
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: #0f172a;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 .divination-main {
   flex: 1;
   overflow: hidden;
-  padding: 20px;
-}
-
-.divination-history {
-  background-color: white;
-  border-radius: 10px;
-  padding: 20px;
-  height: 100%;
+  padding: 18px 14px 24px;
   overflow-y: auto;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-.divination-history h3 {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #333;
+.content {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.08);
+  padding: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.card-title {
+  font-weight: 900;
+  color: #0f172a;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.type-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.type-chip {
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(15, 23, 42, 0.85);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.type-chip.active {
+  border-color: rgba(79, 70, 229, 0.35);
+  box-shadow: 0 12px 34px rgba(79, 70, 229, 0.16);
+  color: #0f172a;
+}
+
+.type-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.question-input {
+  width: 100%;
+  resize: none;
+  padding: 12px 14px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  outline: none;
+  transition: box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.question-input:focus {
+  border-color: rgba(79, 70, 229, 0.35);
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.14);
+}
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primary-btn,
+.ghost-btn {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.26);
+}
+
+.ghost-btn {
+  background: rgba(255, 255, 255, 0.75);
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+.primary-btn:active,
+.ghost-btn:active {
+  transform: translateY(1px);
+}
+
+.primary-btn:disabled,
+.ghost-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
 }
 
 .empty-state {
   text-align: center;
-  padding: 50px;
-  color: #999;
-  font-size: 1.1rem;
+  padding: 34px 10px;
+  color: rgba(15, 23, 42, 0.55);
+  font-size: 13px;
 }
 
 .divination-item {
-  margin-bottom: 20px;
-  padding: 15px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background-color: #fafafa;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .divination-header-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .divination-type {
-  background-color: #4CAF50;
-  color: white;
-  padding: 3px 8px;
-  border-radius: 10px;
-  font-size: 0.8rem;
-  font-weight: bold;
+  background: rgba(79, 70, 229, 0.10);
+  color: #3730a3;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .divination-time {
-  font-size: 0.8rem;
-  color: #666;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.55);
 }
 
 .divination-question {
-  margin-bottom: 10px;
-  padding-left: 5px;
-  border-left: 3px solid #4CAF50;
+  margin-top: 8px;
+  color: rgba(15, 23, 42, 0.90);
+  font-weight: 700;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .divination-result {
   line-height: 1.5;
-  padding-left: 5px;
-  border-left: 3px solid #2196F3;
+  margin-top: 10px;
+  color: rgba(15, 23, 42, 0.86);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
-.divination-footer {
-  padding: 15px 20px;
-  background-color: white;
-  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  z-index: 1200;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.22);
+  backdrop-filter: blur(10px);
 }
 
-.new-divination-form {
-  display: flex;
-  gap: 10px;
+.toast.success {
+  border-color: rgba(16, 185, 129, 0.30);
 }
 
-.new-divination-form input {
-  flex: 1;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 25px;
-}
-
-.new-divination-btn {
-  padding: 15px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 25px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: bold;
+.toast.error {
+  border-color: rgba(239, 68, 68, 0.30);
 }
 </style>
