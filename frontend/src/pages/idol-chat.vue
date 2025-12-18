@@ -306,10 +306,10 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: radial-gradient(1200px 600px at 10% 10%, rgba(99, 102, 241, 0.20), transparent 60%),
-    radial-gradient(900px 500px at 90% 20%, rgba(16, 185, 129, 0.18), transparent 55%),
-    radial-gradient(900px 600px at 20% 90%, rgba(236, 72, 153, 0.14), transparent 60%),
-    linear-gradient(135deg, #f5f7ff 0%, #f8fafc 55%, #f2f7ff 100%);
+  /* 尝试加载用户提供的背景图，如果不存在则显示近似的蓝紫色渐变 */
+  background: url('/bg.jpg') no-repeat center center fixed,
+              linear-gradient(180deg, #c4d4e8 0%, #d8e2f3 50%, #e2dff5 100%);
+  background-size: cover;
 }
 
 .chat-header {
