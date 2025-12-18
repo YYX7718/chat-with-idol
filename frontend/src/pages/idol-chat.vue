@@ -18,14 +18,19 @@
         <div 
           v-for="message in messages" 
           :key="message.id"
-          class="message"
+          class="message-row"
           :class="message.role"
         >
-          <div class="message-content">
-            {{ message.content }}
+          <div class="avatar">
+            {{ message.role === 'user' ? '我' : (idolName ? idolName[0] : 'AI') }}
           </div>
-          <div class="message-time">
-            {{ formatTime(message.timestamp) }}
+          <div class="message-bubble-container">
+            <div class="message-bubble">
+              {{ message.content }}
+            </div>
+            <div class="message-time">
+              {{ formatTime(message.timestamp) }}
+            </div>
           </div>
         </div>
       </div>
@@ -254,7 +259,7 @@ export default {
     
     const goBack = () => {
       localStorage.removeItem('currentSession')
-      window.location.href = '#/chat'
+      window.location.href = '#/divination'
     }
     
     // 监听消息变化，自动滚动到底部
@@ -395,41 +400,109 @@ export default {
   padding: 18px 14px 26px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.message {
-  max-width: min(78%, 720px);
-  padding: 12px 14px;
-  border-radius: 18px;
-  position: relative;
-  line-height: 1.55;
+.message-row {
+  display: flex;
+  gap: 10px;
+  max-width: 90%;
+}
+
+.message-row.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.message-row.idol {
+  align-self: flex-start;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: #64748b;
+  flex-shrink: 0;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  border: 1px solid rgba(255,255,255,0.5);
+}
+
+.message-row.user .avatar {
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: white;
+  border: none;
+}
+
+.message-bubble-container {
+  display: flex;
+  flex-direction: column;
+  max-width: 100%;
+}
+
+.message-bubble {
+  padding: 10px 14px;
+  border-radius: 8px;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
+  font-size: 15px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
-.message.user {
-  align-self: flex-end;
-  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+.message-row.user .message-bubble {
+  background: #a5b4fc; /* Weaker purple for bubble to differentiate from avatar */
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
   color: #ffffff;
-  border-bottom-right-radius: 6px;
-  box-shadow: 0 10px 26px rgba(79, 70, 229, 0.20);
 }
 
-.message.idol {
-  align-self: flex-start;
-  background: rgba(255, 255, 255, 0.82);
-  color: #0f172a;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-bottom-left-radius: 6px;
-  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
+.message-row.idol .message-bubble {
+  background: #ffffff;
+  color: #1e293b;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Little triangle arrow for bubbles */
+.message-row.idol .message-bubble::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 14px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #ffffff;
+}
+
+.message-row.user .message-bubble::before {
+  content: "";
+  position: absolute;
+  right: -6px;
+  top: 14px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 6px solid #6366f1;
 }
 
 .message-time {
-  font-size: 0.7rem;
-  opacity: 0.7;
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+
+.message-row.user .message-time {
   text-align: right;
-  margin-top: 5px;
 }
 
 .chat-footer {

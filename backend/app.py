@@ -153,7 +153,10 @@ def send_message(session_id):
                     need_translation = persona_config.get("default_language", "zh").lower() not in ["zh", "zh-cn", "chinese"]
                     idol_response = idol_chat_service.generate_idol_response(persona_config, session, translate=need_translation)
                     
-                    response_content = idol_response["persona_reply"]
+                    # 添加召唤提示语
+                    summon_msg = f"✨ 正在为您召唤 {idol_name} AI 疗愈师...\n\n"
+                    response_content = summon_msg + idol_response["persona_reply"]
+                    
                     if idol_response.get("translation"):
                         response_content += f"\n\n[翻译]\n{idol_response['translation']}"
                 except Exception as e:

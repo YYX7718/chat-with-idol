@@ -1,4 +1,6 @@
 import logging
+import json
+import re
 from .llm_client import llm_client
 
 logger = logging.getLogger(__name__)
@@ -18,19 +20,34 @@ class DivinationService:
         """
         prompt = self._create_divination_prompt(idol_info, divination_type, question, user_emotion)
         logger.info("divination_input type=%s question=%s", divination_type, str(question)[:500])
+        
         result = self.llm_client.generate_response(prompt)
-        if not self._has_required_sections(result):
-            retry_prompt = prompt + "\n\n再次强调：输出必须包含且仅包含四个段落标题：【卦象与出处】【象意解读】【情绪安抚】【过渡询问】。"
-            result = self.llm_client.generate_response(retry_prompt, temperature=0.2)
-        logger.info("divination_output result=%s", str(result)[:1200])
-        return result
+        logger.info("divination_raw_output result=%s", str(result)[:1200])
+        
+        # 尝试提取 JSON
+        try:
+            # 查找 JSON 块
+            match = re.search(r'\{.*\}', result, re.DOTALL)
+            if match:
+                json_str = match.group(0)
+                data = json.loads(json_str)
+                
+                # 格式化输出给用户，去除显式的标签，使其更自然
+                formatted_result = f"【{data.get('hexagram', '未知卦象')}】\n\n"
+                formatted_result += f"{data.get('source', '')}\n\n"
+                formatted_result += f"{data.get('interpretation', '')}\n\n"
+                formatted_result += f"{data.get('comfort', '')}\n\n"
+                formatted_result += f"{data.get('question', '')}"
+                
+                return formatted_result
+            else:
+                # 如果不是 JSON，尝试直接返回（兼容旧格式或失败情况）
+                logger.warning("Failed to parse JSON from divination response")
+                return result
+        except Exception as e:
+            logger.error(f"Error parsing divination response: {e}")
+            return result
 
-    def _has_required_sections(self, text):
-        if not text:
-            return False
-        required = ["【卦象与出处】", "【象意解读】", "【情绪安抚】", "【过渡询问】"]
-        return all(r in text for r in required)
-    
     def _create_divination_prompt(self, idol_info, divination_type, question, user_emotion):
         """
         创建占卜提示词
@@ -41,26 +58,18 @@ class DivinationService:
 用户的情绪（可选）：{user_emotion if user_emotion else "未知"}
 占卜类型：{divination_type if divination_type else "通用"}
 
-请严格按照以下格式输出（不要输出其他无关内容）：
+请输出一个标准的 JSON 对象，不要包含 Markdown 格式标记（如 ```json），包含以下字段：
 
-【卦象与出处】
-卦名
-至少一句真实古籍原文（如卦辞 / 象传）
-
-【象意解读】
-现代语言解释
-不使用绝对判断
-
-【情绪安抚】
-缓解焦虑
-强调过程而非结果
-
-【过渡询问】
-明确询问是否需要进一步建议或陪伴
+1. "hexagram": 卦名（例如：第X卦 卦名 卦意），请确保卦名专业准确。
+2. "source": 至少一句真实古籍原文（如卦辞 / 象传）。
+3. "interpretation": 现代语言解释，不使用绝对判断。
+4. "comfort": 针对用户的情绪安抚，语气温柔，缓解焦虑。不要出现"【情绪安抚】"这样的标题。
+5. "question": 明确询问是否需要进一步建议或陪伴。不要出现"【过渡询问】"这样的标题。
 
 ❌ 禁止行为
-不得预测具体结果（如成败、时间）
-不得使用“必然、注定、灾难”等词
+- 不得预测具体结果（如成败、时间）
+- 不得使用“必然、注定、灾难”等词
+- 输出必须是纯 JSON 格式
         """
         
         return prompt.strip()
