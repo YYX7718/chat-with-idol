@@ -140,18 +140,27 @@ def send_message(session_id):
             elif step == "ASK_IDOL":
                 idol_name = content.strip()
                 try:
+                    app.logger.info(f"Generating persona for: {idol_name}")
                     persona_config = idol_chat_service.generate_persona_profile(idol_name)
+                    app.logger.info(f"Persona config generated: {persona_config}")
+                    
                     session.persona_config = persona_config
                     session.idol_id = "dynamic_idol"
                     session.transition_step = None
                     session.set_state(session.STATE_IDOL_CHAT)
 
-                    idol_response = idol_chat_service.generate_idol_response(persona_config, session)
+                    # 如果默认语言不是中文，则请求翻译
+                    need_translation = persona_config.get("default_language", "zh").lower() not in ["zh", "zh-cn", "chinese"]
+                    idol_response = idol_chat_service.generate_idol_response(persona_config, session, translate=need_translation)
+                    
                     response_content = idol_response["persona_reply"]
                     if idol_response.get("translation"):
                         response_content += f"\n\n[翻译]\n{idol_response['translation']}"
-                except Exception:
-                    response_content = f"抱歉，我暂时没法生成“{idol_name}”的虚拟人设。你可以换一个名字再试试。"
+                except Exception as e:
+                    app.logger.error(f"Error in ASK_IDOL phase: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    response_content = f"抱歉，我暂时没法生成“{idol_name}”的虚拟人设。请稍后再试，或者换一个名字。"
             else:
                 session.transition_step = "ASK_MORE"
                 response_content = "如果你愿意继续，我可以陪你聊聊。想要吗？"

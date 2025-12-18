@@ -32,8 +32,16 @@ JSON 结构如下：
         """
         
         try:
+            import re
             response_text = self.llm_client.generate_response(prompt)
-            response_text = response_text.replace("```json", "").replace("```", "").strip()
+            # 尝试提取 JSON 部分
+            match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if match:
+                response_text = match.group(0)
+            else:
+                # 尝试简单的清理
+                response_text = response_text.replace("```json", "").replace("```", "").strip()
+            
             persona_config = json.loads(response_text)
             
             if "name" not in persona_config:
