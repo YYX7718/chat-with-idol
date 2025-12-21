@@ -24,21 +24,24 @@ class TestDivinationService(unittest.TestCase):
         # 验证提示词包含必要的信息
         self.assertIn('占卜类型：love', prompt)
         self.assertIn('我和我的伴侣会有未来吗？', prompt)
-        self.assertIn('输出必须是纯 JSON 格式', prompt)
+        self.assertIn('请严格按照以下 XML 标签格式输出', prompt)
     
     @patch('backend.services.divination_service.llm_client.generate_response')
     def test_generate_divination(self, mock_generate_response):
         """测试生成占卜结果"""
+        # 模拟 LLM 返回 XML
         mock_generate_response.return_value = """
-{
-  "hexagram": "第01卦 乾为天（乾上乾下）",
-  "source": "卦辞：天行健，君子以自强不息。\\n象曰：天行健，君子以自强不息。",
-  "interpretation": "这是一段较长的解读，用于覆盖测试对长度的要求。这里不做绝对判断，只给象意方向。\\n\\n就你的问题而言，更多强调自我修持与节奏。\\n\\n利在主动与坚持，弊在急躁与硬碰硬。\\n\\n行动上，先稳住当下，再谈推进。",
-  "advice": ["先把真正的担心说清楚", "给关系留一点呼吸感", "用行动代替反复内耗"],
-  "comfort": "别急，你已经在往更好的方向走了。",
-  "question": "你更在意的是“能不能继续”，还是“怎么继续得更舒服”？"
-}
-        """.strip()
+        <hexagram>第31卦 咸卦</hexagram>
+        <source>卦辞：咸，亨，利贞，取女吉。</source>
+        <interpretation>咸卦象征感应。</interpretation>
+        <advice>
+        1. 保持真诚
+        2. 顺其自然
+        3. 多沟通
+        </advice>
+        <comfort>别担心，一切都会好的。</comfort>
+        <question>你现在感觉如何？</question>
+        """
         
         # 调用占卜服务
         result = self.divination_service.generate_divination(
@@ -48,11 +51,13 @@ class TestDivinationService(unittest.TestCase):
             user_emotion=None
         )
         
-        # 验证结果
-        self.assertIn('【第01卦 乾为天', result)
-        self.assertIn('给你三条落地的小建议', result)
-        self.assertIn('你更在意的是', result)
-        mock_generate_response.assert_called_once()
+        # 验证结果包含格式化后的内容
+        self.assertIn('【第31卦 咸卦】', result)
+        self.assertIn('卦辞：咸，亨，利贞，取女吉。', result)
+        self.assertIn('咸卦象征感应。', result)
+        self.assertIn('保持真诚', result)
+        self.assertIn('别担心，一切都会好的。', result)
+        self.assertIn('你现在感觉如何？', result)
 
 if __name__ == '__main__':
     unittest.main()
