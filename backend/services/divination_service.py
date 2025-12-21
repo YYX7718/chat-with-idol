@@ -21,15 +21,21 @@ class DivinationService:
         prompt = self._create_divination_prompt(idol_info, divination_type, question, user_emotion)
         logger.info("divination_input type=%s question=%s", divination_type, str(question)[:500])
         
-        result = self.llm_client.generate_response(prompt)
+        try:
+            result = self.llm_client.generate_response(prompt)
+        except Exception as e:
+            logger.error(f"LLM generation failed: {e}")
+            return "抱歉，由于神秘力量（网络波动），这次占卜未能完成。请稍息片刻，诚心再试一次。"
+
         logger.info("divination_raw_output result=%s", str(result)[:1200])
         
         # 尝试提取内容 (使用 XML 标签更稳健)
         try:
             # 定义提取函数
             def extract_tag(tag, text):
-                pattern = f"<{tag}>(.*?)</{tag}>"
-                match = re.search(pattern, text, re.DOTALL)
+                # 允许标签带有属性或空格，忽略大小写
+                pattern = f"<{tag}.*?>(.*?)</{tag}>"
+                match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
                 return match.group(1).strip() if match else ""
 
             hexagram = extract_tag("hexagram", result)
@@ -92,45 +98,46 @@ class DivinationService:
         创建占卜提示词
         """
         prompt = f"""
-你是一位精通梅花易数的占卜师。
+你是一位精通梅花易数与周易的资深占卜师，行文风格古朴典雅与现代心理咨询相结合。
 用户的问题是："{question}"
 用户的情绪（可选）：{user_emotion if user_emotion else "未知"}
 占卜类型：{divination_type if divination_type else "通用"}
 
-**重要：请严格按照以下 XML 标签格式输出，不要输出任何其他内容。**
+**重要：请严格按照以下 XML 标签格式输出，内容必须详实、深入，不要输出任何其他内容。**
 
 <hexagram>
 专业卦名，包含卦序与上下卦象（如：第31卦 咸卦 泽山咸 上兑下艮）
 </hexagram>
 
 <source>
-古籍原文句1（标注出处）
-古籍原文句2（标注出处）
+请引用至少两段与该卦象最相关的古籍原文（如《周易》卦辞、爻辞、《梅花易数》象辞等）。
+每一段原文后，必须紧跟一段白话文简译，帮助用户理解古籍含义。
 </source>
 
 <interpretation>
-详细解读（不少于500字）。请分段阐述：整体象意、对本问题的具体指向、潜在变数、当下行动建议。
+请提供一份极具深度的卦象解读（字数不少于 600 字）。请严格按照以下逻辑分段撰写：
+1. **卦象详解**：从上下卦的五行生克、自然意象（如山、泽、火、水等）入手，详细解释该卦的本质含义。
+2. **结合古籍**：简要剖析上述引用的古籍原文如何对应到当前的卦象中。
+3. **深度分析**：针对用户的问题（"{question}"），结合卦象变化（变爻）进行具体、细腻的分析。分析现状、潜在的阻碍、发展的趋势。请把用户带入到卦象的情境中去。
+4. **最终结论**：基于以上分析，给出一个明确但不绝对的总结性判断。
 </interpretation>
 
 <advice>
-建议1（简练）
-建议2（简练）
-建议3（简练）
+基于结论，给出 3-4 条具体、可执行的行动建议。每条建议应当包含“做什么”和“怎么做”。
 </advice>
 
 <comfort>
-针对用户情绪的安抚话语（自然温暖）
+针对用户可能存在的焦虑或困惑，给予一段温暖、治愈、富有哲理的情绪疏导（100字左右）。
 </comfort>
 
 <question>
-结尾的引导性追问（自然温暖）
+结尾抛出一个引导性的问题，激发用户对现状的深层思考，或引导用户进行下一步的行动（自然温暖）。
 </question>
 
 ❌ 禁止行为
-- 不得预测具体结果（如成败、时间）
-- 不得使用“必然、注定、灾难”等词
-- 不得使用 JSON 格式
-- 只能使用上述 XML 标签
+- 不得预测具体的死亡、灾难、极度负面的结果。
+- 不得使用 JSON 格式。
+- 只能使用上述 XML 标签。
         """
         
         return prompt.strip()
