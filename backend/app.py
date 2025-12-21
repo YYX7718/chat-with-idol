@@ -174,7 +174,8 @@ def send_message(session_id):
                 response_content = "系统错误：未找到偶像配置。请重新输入偶像名字。"
             else:
                 idol_info = session.persona_config
-                idol_response = idol_chat_service.generate_idol_response(idol_info, session)
+                need_translation = idol_info.get("default_language", "zh").lower() not in ["zh", "zh-cn", "chinese"]
+                idol_response = idol_chat_service.generate_idol_response(idol_info, session, translate=need_translation)
                 response_content = idol_response['persona_reply']
                 if idol_response.get('translation'):
                     response_content += f"\n\n[翻译]\n{idol_response['translation']}"

@@ -306,10 +306,28 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* 尝试加载用户提供的背景图，如果不存在则显示近似的蓝紫色渐变 */
-  background: url('/bg.jpg') no-repeat center center fixed,
-              linear-gradient(180deg, #c4d4e8 0%, #d8e2f3 50%, #e2dff5 100%);
+  position: relative;
+  overflow: hidden;
+  background: #ebe7df;
+}
+
+.chat-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/divination-wallpaper.jpg') no-repeat center center;
   background-size: cover;
+  filter: blur(1px) saturate(0.95) contrast(1.02);
+  transform: scale(1.04);
+  z-index: 0;
+}
+
+.chat-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.76) 0%, rgba(248, 250, 252, 0.62) 50%, rgba(248, 250, 252, 0.76) 100%);
+  z-index: 0;
 }
 
 .chat-header {
@@ -320,6 +338,9 @@ export default {
   background: rgba(255, 255, 255, 0.72);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .title-group {
@@ -392,6 +413,8 @@ export default {
 .chat-main {
   flex: 1;
   overflow: hidden;
+  position: relative;
+  z-index: 1;
 }
 
 .messages-container {
@@ -511,6 +534,9 @@ export default {
   background: rgba(255, 255, 255, 0.72);
   border-top: 1px solid rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(10px);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
 }
 
 .composer {

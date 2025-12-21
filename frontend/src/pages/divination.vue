@@ -14,6 +14,14 @@
       <div class="content">
         <section class="card">
           <div class="card-title">开始占卜</div>
+          <div class="kaiti-notice">
+            <div class="kaiti-notice-title">起卦提示</div>
+            <div class="kaiti-notice-lines">
+              <div>1. 子时不可占卜</div>
+              <div>2. 每日占卜最好不超过三卦</div>
+              <div>3. 无事不起卦</div>
+            </div>
+          </div>
           <div class="type-row">
             <button
               v-for="type in divinationTypes"
@@ -209,10 +217,28 @@ export default {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  /* 尝试加载用户提供的背景图，如果不存在则显示近似的蓝紫色渐变 */
-  background: url('/bg.jpg') no-repeat center center fixed,
-              linear-gradient(180deg, #c4d4e8 0%, #d8e2f3 50%, #e2dff5 100%);
+  position: relative;
+  overflow: hidden;
+  background: #ebe7df;
+}
+
+.divination-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/divination-wallpaper.jpg') no-repeat center center;
   background-size: cover;
+  filter: saturate(0.95) contrast(1.02);
+  transform: scale(1.02);
+  z-index: 0;
+}
+
+.divination-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.78) 0%, rgba(248, 250, 252, 0.62) 45%, rgba(248, 250, 252, 0.78) 100%);
+  z-index: 0;
 }
 
 .divination-header {
@@ -223,6 +249,9 @@ export default {
   background: rgba(255, 255, 255, 0.72);
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
   backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .header-left {
@@ -253,6 +282,8 @@ export default {
   overflow: hidden;
   padding: 18px 14px 24px;
   overflow-y: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .content {
@@ -262,6 +293,36 @@ export default {
   display: grid;
   grid-template-columns: 1fr;
   gap: 14px;
+}
+
+.content > .card {
+  position: relative;
+}
+
+.kaiti-notice {
+  border-radius: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 10px 30px rgba(2, 6, 23, 0.06);
+  margin-bottom: 12px;
+  font-family: KaiTi, STKaiti, "Kaiti SC", DFKai-SB, serif;
+  color: rgba(15, 23, 42, 0.9);
+}
+
+.kaiti-notice-title {
+  font-size: 15px;
+  font-weight: 900;
+  margin-bottom: 6px;
+  letter-spacing: 0.6px;
+  color: rgba(30, 41, 59, 0.9);
+}
+
+.kaiti-notice-lines {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .card {
@@ -445,4 +506,16 @@ export default {
 .toast.error {
   border-color: rgba(239, 68, 68, 0.30);
 }
+
+@media (min-width: 980px) {
+  .content {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 16px;
+  }
+
+  .history {
+    align-self: start;
+  }
+}
+
 </style>
