@@ -26,15 +26,31 @@ class DivinationService:
         
         # 尝试提取 JSON
         try:
-            # 查找 JSON 块
-            match = re.search(r'\{.*\}', result, re.DOTALL)
+            # 1. 预处理：移除 Markdown 代码块标记（最常见的干扰源）
+            # 即使 LLM 输出了 ```json ... ```，我们先把它剥离掉
+            clean_result = result
+            if "```json" in clean_result:
+                clean_result = clean_result.replace("```json", "").replace("```", "")
+            elif "```" in clean_result:
+                clean_result = clean_result.replace("```", "")
+            
+            # 2. 查找最外层的 JSON 对象
+            # 使用非贪婪匹配或 DOTALL 确保跨行匹配
+            match = re.search(r'\{.*\}', clean_result, re.DOTALL)
+            
             if match:
                 json_str = match.group(0)
                 data = json.loads(json_str)
                 
                 # 格式化输出给用户，去除显式的标签，使其更自然
                 formatted_result = f"【{data.get('hexagram', '未知卦象')}】\n\n"
-                formatted_result += f"{data.get('source', '')}\n\n"
+                
+                # 处理 source，可能是字符串也可能是列表
+                source = data.get('source', '')
+                if isinstance(source, list):
+                    source = "\n".join(source)
+                formatted_result += f"{source}\n\n"
+                
                 formatted_result += f"{data.get('interpretation', '')}\n\n"
                 advice = data.get('advice', '')
                 if isinstance(advice, list):
@@ -65,19 +81,22 @@ class DivinationService:
 用户的情绪（可选）：{user_emotion if user_emotion else "未知"}
 占卜类型：{divination_type if divination_type else "通用"}
 
-请输出一个标准的 JSON 对象，不要包含 Markdown 格式标记（如 ```json），包含以下字段：
+**重要：请务必只输出纯 JSON 字符串，严禁使用 Markdown 代码块（如 ```json），严禁输出任何其他解释性文字。**
 
-1. "hexagram": 专业卦名，尽量包含卦序（如“第01卦 乾为天”）与卦象（上卦/下卦），不要太模糊。
-2. "source": 至少两句真实古籍原文（优先《周易》卦辞/爻辞/象传；可辅以《梅花易数》），并在句子前标注来源（如“卦辞：…”“象曰：…”）。
-3. "interpretation": 更完整的解读（不少于 500 字），分段写清楚：整体象意、对本问题的指向、可能的利/弊与变数、当下可行的行动方向。禁止确定性断言。
-4. "advice": 三条可执行建议（数组形式），每条不超过 40 字。
-5. "comfort": 针对用户情绪的安抚（自然口吻，不要出现“【情绪安抚】”标题）。
-6. "question": 结尾温柔追问一句，帮助用户继续表达（自然口吻，不要出现“【过渡询问】”标题）。
+JSON 结构必须严格符合以下格式：
+{{
+  "hexagram": "专业卦名，包含卦序与上下卦象（如：第31卦 咸卦 泽山咸 上兑下艮）",
+  "source": ["古籍原文句1（标注出处）", "古籍原文句2（标注出处）"],
+  "interpretation": "详细解读（不少于500字）。请分段阐述：整体象意、对本问题的具体指向、潜在变数、当下行动建议。",
+  "advice": ["建议1（简练）", "建议2（简练）", "建议3（简练）"],
+  "comfort": "针对用户情绪的安抚话语（自然温暖）",
+  "question": "结尾的引导性追问（自然温暖）"
+}}
 
 ❌ 禁止行为
 - 不得预测具体结果（如成败、时间）
 - 不得使用“必然、注定、灾难”等词
-- 输出必须是纯 JSON 格式
+- **再次强调：不要输出 ```json 或 ``` 标记，只输出 {{ ... }}**
         """
         
         return prompt.strip()

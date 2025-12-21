@@ -65,7 +65,7 @@
               <span class="divination-time">{{ formatTime(divination.timestamp) }}</span>
             </div>
             <div class="divination-question">{{ divination.question }}</div>
-            <div class="divination-result">{{ divination.result }}</div>
+            <div class="divination-result">{{ formatResult(divination.result) }}</div>
           </div>
         </section>
       </div>
@@ -195,6 +195,47 @@ export default {
       })
     })
     
+    const formatResult = (text) => {
+      // 简单防呆：如果看起来像 JSON，尝试解析
+      if (text.trim().startsWith('{') || text.trim().startsWith('```')) {
+        try {
+          let cleanText = text
+          if (cleanText.includes('```json')) {
+            cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '')
+          } else if (cleanText.includes('```')) {
+            cleanText = cleanText.replace(/```/g, '')
+          }
+          
+          const match = cleanText.match(/\{[\s\S]*\}/)
+          if (match) {
+            const data = JSON.parse(match[0])
+            let result = `【${data.hexagram || '未知卦象'}】\n\n`
+            
+            const source = Array.isArray(data.source) ? data.source.join('\n') : (data.source || '')
+            result += `${source}\n\n`
+            
+            result += `${data.interpretation || ''}\n\n`
+            
+            if (Array.isArray(data.advice) && data.advice.length > 0) {
+              result += `给你三条落地的小建议：\n`
+              data.advice.forEach((item, index) => {
+                result += `${index + 1}. ${item}\n`
+              })
+              result += '\n'
+            }
+            
+            result += `${data.comfort || ''}\n\n`
+            result += `${data.question || ''}`
+            
+            return result
+          }
+        } catch (e) {
+          console.warn('Failed to parse result as JSON in frontend fallback', e)
+        }
+      }
+      return text
+    }
+
     return {
       sessionId,
       idolName,
@@ -207,7 +248,8 @@ export default {
       busy,
       toast,
       goChat,
-      submitDivination
+      submitDivination,
+      formatResult
     }
   }
 }
