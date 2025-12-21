@@ -16,7 +16,7 @@
     <main class="chat-main">
       <div class="messages-container" ref="messagesContainer">
         <div 
-          v-for="message in messages" 
+          v-for="message in viewMessages" 
           :key="message.id"
           class="message-row"
           :class="message.role"
@@ -26,7 +26,11 @@
           </div>
           <div class="message-bubble-container">
             <div class="message-bubble">
-              {{ message.content }}
+              <div class="message-main">{{ message._main }}</div>
+              <div v-if="message._translation" class="message-translation">
+                <div class="translation-label">中文</div>
+                <div class="translation-text">{{ message._translation }}</div>
+              </div>
             </div>
             <div class="message-time">
               {{ formatTime(message.timestamp) }}
@@ -97,7 +101,7 @@
 </template>
 
 <script>
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import api from '../api'
 
 export default {
@@ -121,6 +125,28 @@ export default {
       toast.value = { show: true, text, type }
       setTimeout(() => (toast.value.show = false), 2500)
     }
+
+    const splitMessageContent = (text) => {
+      const raw = String(text || '')
+      const marker = '\n\n[翻译]\n'
+      const idx = raw.indexOf(marker)
+      if (idx === -1) return { main: raw, translation: '' }
+      return {
+        main: raw.slice(0, idx).trimEnd(),
+        translation: raw.slice(idx + marker.length).trim()
+      }
+    }
+
+    const viewMessages = computed(() => {
+      return messages.value.map((m) => {
+        const parts = splitMessageContent(m.content)
+        return {
+          ...m,
+          _main: parts.main,
+          _translation: parts.translation
+        }
+      })
+    })
     
     // 占卜类型
     const divinationTypes = [
@@ -257,7 +283,13 @@ export default {
       busy.value = false
     }
     
-    const goBack = () => {
+    const goBack = async () => {
+      try {
+        if (sessionId.value) {
+          await api.deleteSession(sessionId.value)
+        }
+      } catch (e) {
+      }
       localStorage.removeItem('currentSession')
       window.location.href = '#/divination'
     }
@@ -280,6 +312,7 @@ export default {
       sessionId,
       idolName,
       messages,
+      viewMessages,
       inputMessage,
       interactionEnabled,
       showDivination,
@@ -480,6 +513,35 @@ export default {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
+.message-main {
+  white-space: pre-wrap;
+}
+
+.message-translation {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.55);
+}
+
+.translation-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+  background: rgba(15, 23, 42, 0.08);
+  color: rgba(15, 23, 42, 0.78);
+  margin-bottom: 6px;
+}
+
+.translation-text {
+  white-space: pre-wrap;
+  opacity: 0.92;
+}
+
 .message-row.user .message-bubble {
   background: #a5b4fc; /* Weaker purple for bubble to differentiate from avatar */
   background: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
@@ -490,6 +552,19 @@ export default {
   background: #ffffff;
   color: #1e293b;
   border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.message-row.user .message-translation {
+  border-top-color: rgba(255, 255, 255, 0.42);
+}
+
+.message-row.user .translation-label {
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.message-row.user .translation-text {
+  opacity: 0.92;
 }
 
 /* Little triangle arrow for bubbles */

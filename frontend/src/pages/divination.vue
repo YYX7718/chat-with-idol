@@ -31,7 +31,8 @@
               :disabled="busy"
               @click="selectedType = type.value"
             >
-              {{ type.name }}
+              <span class="type-chip-icon">{{ type.icon }}</span>
+              <span class="type-chip-text">{{ type.name }}</span>
             </button>
           </div>
           <textarea
@@ -92,10 +93,10 @@ export default {
     const toast = ref({ show: false, text: '', type: 'info' })
 
     const divinationTypes = [
-      { value: 'love', name: '爱情' },
-      { value: 'career', name: '事业' },
-      { value: 'fortune', name: '运势' },
-      { value: 'study', name: '学业' }
+      { value: 'love', name: '爱情', icon: '❤' },
+      { value: 'career', name: '事业', icon: '✦' },
+      { value: 'fortune', name: '运势', icon: '☯' },
+      { value: 'study', name: '学业', icon: '✎' }
     ]
 
     const showToast = (text, type = 'info') => {
@@ -358,6 +359,26 @@ export default {
   background: rgba(255, 255, 255, 0.72);
   cursor: pointer;
   transition: transform 0.06s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-chip-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: rgba(15, 23, 42, 0.78);
+  font-size: 13px;
+}
+
+.type-chip.active .type-chip-icon {
+  background: rgba(79, 70, 229, 0.14);
+  color: #3730a3;
 }
 
 .type-chip.active {
