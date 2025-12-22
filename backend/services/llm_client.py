@@ -16,7 +16,7 @@ class LLMClient:
         if self.openai_api_key:
             openai.api_key = self.openai_api_key
     
-    def generate_response(self, prompt, model=None, max_tokens=500, temperature=0.7):
+    def generate_response(self, prompt, model=None, max_tokens=2000, temperature=0.7):
         """
         生成LLM响应
         :param prompt: 提示词
