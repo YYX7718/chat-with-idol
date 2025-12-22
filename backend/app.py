@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -117,7 +118,6 @@ def send_message(session_id):
             session.set_state(session.STATE_TRANSITION)
             session.transition_step = "ASK_MORE"
             response_content = result
-            # 这里的过渡已经包含在 result (divination_service 生成的 <question> 标签) 中了，不再重复添加硬编码文字
             
         elif current_state == session.STATE_TRANSITION:
             step = session.transition_step or "ASK_MORE"
@@ -130,38 +130,63 @@ def send_message(session_id):
                 affirmative_keywords = ["需要", "想", "要", "好的", "好", "可以", "嗯", "想聊", "陪伴", "请"]
                 return any(k in text for k in affirmative_keywords) and not is_negative(text)
 
+            def normalize_idol_name(text):
+                t = (text or "").strip()
+                t = t.strip(" \t\r\n\"'“”‘’")
+                t = re.sub(r"^(我想|想|我要|要|请|帮我|给我|召唤|召请|请你召唤|请召唤)[：:\s]*", "", t)
+                t = re.sub(r"^(一位|一个)?(虚拟)?(偶像)?(疗愈师)?[：:\s]*", "", t)
+                return t.strip()
+
+            def looks_like_name(text):
+                t = normalize_idol_name(text)
+                if not t:
+                    return False
+                if any(k in t for k in ["占卜", "问题", "建议", "陪伴", "聊聊", "需要", "不需要", "不用", "不要"]):
+                    return False
+                if re.fullmatch(r"[A-Za-z][A-Za-z .'\-]{1,39}", t):
+                    return True
+                if re.fullmatch(r"[\u4e00-\u9fff·\s]{2,20}", t):
+                    return True
+                return False
+
+            def summon_idol(idol_name_raw):
+                idol_name = normalize_idol_name(idol_name_raw)
+                if not idol_name:
+                    return "你想召唤谁？直接把名字发给我就好。"
+
+                persona_config = idol_chat_service.generate_persona_profile(idol_name)
+                session.persona_config = persona_config
+                session.idol_id = "dynamic_idol"
+                session.transition_step = None
+                session.set_state(session.STATE_IDOL_CHAT)
+
+                lang = (persona_config.get("default_language", "zh") or "zh").lower()
+                need_translation = lang not in ["zh", "zh-cn", "chinese", "en", "english"]
+                idol_response = idol_chat_service.generate_idol_response(persona_config, session, translate=need_translation)
+                response_text = f"✨ 正在为您召唤 {idol_name} AI 疗愈师...\n提示：此“疗愈师”为虚拟 AI 人设，并非偶像真人，仅供娱乐与情绪陪伴。\n\n" + idol_response["persona_reply"]
+                if idol_response.get("translation"):
+                    response_text += f"\n\n[翻译]\n{idol_response['translation']}"
+                return response_text
+
             if step == "ASK_MORE":
                 if is_negative(content):
                     response_content = "明白。我会把这次占卜先放在这里。如果你之后想继续聊聊或需要一点陪伴，随时告诉我。"
                 elif is_affirmative(content):
                     session.transition_step = "ASK_IDOL"
                     response_content = "好的。我可以陪你聊聊。你想选择哪位公众人物作为“虚拟偶像疗愈师”？\n\n提示：这是虚拟 AI 人设，不是真人，仅供娱乐与情绪陪伴。"
+                elif looks_like_name(content):
+                    try:
+                        response_content = summon_idol(content)
+                    except Exception as e:
+                        app.logger.error(f"Error in ASK_MORE direct idol summon: {str(e)}")
+                        response_content = "我明白你想直接召唤一位疗愈师。你可以再把名字发一次吗？"
                 else:
                     response_content = "我在这里。如果你愿意继续，我可以陪你聊聊。\n\n你想要更多建议或陪伴吗？如果想的话，回复“需要”；如果不想，回复“不需要”。"
             elif step == "ASK_IDOL":
-                idol_name = content.strip()
                 try:
-                    app.logger.info(f"Generating persona for: {idol_name}")
-                    persona_config = idol_chat_service.generate_persona_profile(idol_name)
-                    app.logger.info(f"Persona config generated: {persona_config}")
-                    
-                    session.persona_config = persona_config
-                    session.idol_id = "dynamic_idol"
-                    session.transition_step = None
-                    session.set_state(session.STATE_IDOL_CHAT)
-
-                    # 如果默认语言不是中文且不是英文，则请求翻译
-                    lang = persona_config.get("default_language", "zh").lower()
-                    need_translation = lang not in ["zh", "zh-cn", "chinese", "en", "english"]
-                    idol_response = idol_chat_service.generate_idol_response(persona_config, session, translate=need_translation)
-                    
-                    # 添加召唤提示语
-                    summon_msg = f"✨ 正在为您召唤 {idol_name} AI 疗愈师...\n\n"
-                    response_content = summon_msg + idol_response["persona_reply"]
-                    
-                    if idol_response.get("translation"):
-                        response_content += f"\n\n[翻译]\n{idol_response['translation']}"
+                    response_content = summon_idol(content)
                 except Exception as e:
+                    idol_name = normalize_idol_name(content)
                     app.logger.error(f"Error in ASK_IDOL phase: {str(e)}")
                     import traceback
                     traceback.print_exc()

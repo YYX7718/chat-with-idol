@@ -67,7 +67,6 @@ class IdolChatService:
             s = line.strip()
             if not s:
                 continue
-            # 兼容更多标签格式
             m = re.match(r"^[【\[](.+?)[】\]]", s)
             if m:
                 current = m.group(1)
@@ -171,20 +170,17 @@ class IdolChatService:
         prompt = self._create_chat_prompt(idol_info, recent_messages)
         response = self.llm_client.generate_response(prompt)
 
-        # 清理回复内容，移除可能出现的角色标签或多余的前缀
-        # 增加对英文前缀的清理
         name = idol_info.get('name', '')
         response = re.sub(rf"^(你|我|AI|助手|Assistant|{re.escape(name)})[：:]\s*", "", response, flags=re.IGNORECASE).strip()
         
         reply = {
             "persona_reply": response,
-            "language": idol_info.get('default_language', 'zh'),
+            "language": (idol_info.get('default_language') or 'zh').lower(),
             "reminder_virtual": "提示：本对话由虚拟 AI 人设扮演，仅供娱乐与情绪陪伴。"
         }
 
-        # 检查是否真的需要翻译：如果 default_language 是英文，且用户没有明确要求翻译，则不翻译
-        # 但这里的 translate 参数是从外部传入的，外部逻辑已经处理了 zh/en 的判断
-        if translate and idol_info.get('default_language') not in ['zh', 'en']:
+        lang = (idol_info.get('default_language') or 'zh').lower()
+        if translate and lang not in ['zh', 'en']:
             trans_prompt = f"请将以下内容翻译成中文，保持口语化和原本的语气特点，不要有翻译腔：\n\n{response}"
             translation = self.llm_client.generate_response(trans_prompt)
             reply['translation'] = translation
@@ -215,7 +211,7 @@ class IdolChatService:
 【习惯的回应方式】{response_habits}
 【明显避免的说话方式】{avoid_style}
 
-请使用【母语】进行回复。"""
+请使用【母语】进行回复。包括括号内的动作、表情、停顿描写，也必须使用【母语】。"""
 
         conversation = "对话记录：\n"
         for msg in messages:

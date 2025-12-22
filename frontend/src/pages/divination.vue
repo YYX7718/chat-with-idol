@@ -159,11 +159,34 @@ export default {
       }
     }
 
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    const pollDivinationResult = async (knownIds) => {
+      const maxWaitMs = 120000
+      const startedAt = Date.now()
+      while (Date.now() - startedAt < maxWaitMs) {
+        try {
+          const response = await api.getDivinationHistory(sessionId.value)
+          const list = response.divinations || []
+          const nextIds = new Set(list.map((d) => d.id))
+          const hasNew = Array.from(nextIds).some((id) => !knownIds.has(id))
+          if (hasNew) {
+            divinations.value = list
+            return true
+          }
+        } catch (e) {
+        }
+        await sleep(1500)
+      }
+      return false
+    }
+
     const submitDivination = async () => {
       if (busy.value) return
       if (!newQuestion.value.trim()) return
       const question = newQuestion.value.trim()
       newQuestion.value = ''
+      const knownIds = new Set((divinations.value || []).map((d) => d.id))
       try {
         busy.value = true
         await api.requestDivination(sessionId.value, {
@@ -172,11 +195,21 @@ export default {
         })
         await fetchDivinations()
         showToast('占卜完成，进入聊天…', 'success')
-        setTimeout(() => {
-          window.location.href = '#/chat'
-        }, 350)
+        window.location.href = '#/chat'
       } catch (error) {
-        showToast('占卜请求失败，请稍后重试', 'error')
+        const isTimeout = String(error?.code || '').toLowerCase().includes('timeout') || String(error?.message || '').toLowerCase().includes('timeout')
+        if (isTimeout) {
+          showToast('占卜生成中…出结果后会自动进入聊天', 'info')
+          const ok = await pollDivinationResult(knownIds)
+          if (ok) {
+            showToast('占卜完成，进入聊天…', 'success')
+            window.location.href = '#/chat'
+          } else {
+            showToast('占卜生成超时了，请稍后再试', 'error')
+          }
+        } else {
+          showToast('占卜请求失败，请稍后重试', 'error')
+        }
       }
       busy.value = false
     }

@@ -211,6 +211,29 @@ export default {
         console.error('获取消息历史失败:', error)
       }
     }
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+    const pollNewMessage = async (knownIds) => {
+      const maxWaitMs = 120000
+      const startedAt = Date.now()
+      while (Date.now() - startedAt < maxWaitMs) {
+        try {
+          const response = await api.getMessages(sessionId.value)
+          const list = response.messages || []
+          const nextIds = new Set(list.map((m) => m.id))
+          const hasNew = Array.from(nextIds).some((id) => !knownIds.has(id))
+          if (hasNew) {
+            messages.value = list
+            scrollToBottom()
+            return true
+          }
+        } catch (e) {
+        }
+        await sleep(1500)
+      }
+      return false
+    }
     
     // 发送消息
     const sendMessage = async () => {
@@ -265,6 +288,7 @@ export default {
       const question = divinationQuestion.value.trim()
       divinationQuestion.value = ''
       showDivinationQuestion.value = false
+      const knownIds = new Set((messages.value || []).map((m) => m.id))
       
       try {
         busy.value = true
@@ -278,7 +302,19 @@ export default {
         await fetchMessages()
         showToast('占卜完成', 'success')
       } catch (error) {
-        showToast('占卜失败，请稍后重试', 'error')
+        const isTimeout = String(error?.code || '').toLowerCase().includes('timeout') || String(error?.message || '').toLowerCase().includes('timeout')
+        if (isTimeout) {
+          showToast('占卜生成中…', 'info')
+          const ok = await pollNewMessage(knownIds)
+          if (ok) {
+            interactionEnabled.value = true
+            showToast('占卜完成', 'success')
+          } else {
+            showToast('占卜生成超时了，请稍后再试', 'error')
+          }
+        } else {
+          showToast('占卜失败，请稍后重试', 'error')
+        }
       }
       busy.value = false
     }
