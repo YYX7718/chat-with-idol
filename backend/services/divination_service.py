@@ -41,7 +41,6 @@ class DivinationService:
             hexagram = extract_tag("hexagram", result)
             source = extract_tag("source", result)
             interpretation = extract_tag("interpretation", result)
-            advice_raw = extract_tag("advice", result)
             comfort = extract_tag("comfort", result)
             question = extract_tag("question", result)
 
@@ -71,21 +70,10 @@ class DivinationService:
 
             # 格式化输出
             formatted_result = f"【{hexagram}】\n\n"
-            formatted_result += f"{source}\n\n"
-            formatted_result += f"{interpretation}\n\n"
-            
-            if advice_raw:
-                formatted_result += "给你三条落地的小建议：\n"
-                # 处理建议列表（按行分割）
-                advice_lines = [line.strip() for line in advice_raw.split('\n') if line.strip()]
-                for idx, line in enumerate(advice_lines):
-                    # 如果模型自己加了序号，去掉它
-                    clean_line = re.sub(r'^\d+[\.、]\s*', '', line)
-                    formatted_result += f"{idx+1}. {clean_line}\n"
-                formatted_result += "\n"
-
-            formatted_result += f"{comfort}\n\n"
-            formatted_result += f"{question}"
+            formatted_result += f"{source.strip()}\n\n"
+            formatted_result += f"{interpretation.strip()}\n\n"
+            formatted_result += f"{comfort.strip()}\n\n"
+            formatted_result += f"{question.strip()}"
             
             return formatted_result
 
@@ -103,35 +91,32 @@ class DivinationService:
 用户的情绪（可选）：{user_emotion if user_emotion else "未知"}
 占卜类型：{divination_type if divination_type else "通用"}
 
-**重要：请严格按照以下 XML 标签格式输出，内容必须详实、深入，不要输出任何其他内容。**
+**重要：输出必须包含四段内容，使用空行分段，但不要出现“卦象与出处/象意解读/情绪安抚/过渡询问”等标签字样。**
+**重要：请严格按照以下 XML 标签格式输出，不要输出任何其他内容。**
 
 <hexagram>
 专业卦名，包含卦序与上下卦象（如：第31卦 咸卦 泽山咸 上兑下艮）
 </hexagram>
 
 <source>
-请引用至少两段与该卦象最相关的古籍原文（如《周易》卦辞、爻辞、《梅花易数》象辞等）。
-每一段原文后，必须紧跟一段白话文简译，帮助用户理解古籍含义。
+至少一句真实古籍原文（优先《周易》卦辞/象传/爻辞），并标注出处（如《周易·咸卦》）。
+紧接着用现代语言解释这句古文的含义（不要用“译：”等标签）。
 </source>
 
 <interpretation>
-请提供一份极具深度的卦象解读（字数不少于 600 字）。请严格按照以下逻辑分段撰写：
-1. **卦象详解**：从上下卦的五行生克、自然意象（如山、泽、火、水等）入手，详细解释该卦的本质含义。
-2. **结合古籍**：简要剖析上述引用的古籍原文如何对应到当前的卦象中。
-3. **深度分析**：针对用户的问题（"{question}"），结合卦象变化（变爻）进行具体、细腻的分析。分析现状、潜在的阻碍、发展的趋势。请把用户带入到卦象的情境中去。
-4. **最终结论**：基于以上分析，给出一个明确但不绝对的总结性判断。
+象意解读，必须足够详细（不少于 900 字），并满足：
+1) 现代语言解释，逻辑清晰、分段表达。
+2) 不使用绝对判断，不出现“必然/注定/一定/肯定/灾难”等词，用“更像/可能/倾向/如果…那么…”表达。
+3) 先结合古籍，再解释卦象（上下卦意象、互卦/错综/五行可选），然后给出针对问题的分析，最后自然收束到一个结论。
+4) 解读可以稍微含蓄一点，保留适度留白：不要把情节说得过细，不要替用户“写死”某个具体走向；多给 2-3 种可能的理解路径与对应的提醒点。
 </interpretation>
 
-<advice>
-基于结论，给出 3-4 条具体、可执行的行动建议。每条建议应当包含“做什么”和“怎么做”。
-</advice>
-
 <comfort>
-针对用户可能存在的焦虑或困惑，给予一段温暖、治愈、富有哲理的情绪疏导（100字左右）。
+情绪安抚：缓解焦虑，强调过程而非结果，语气温柔自然（不少于 120 字）。
 </comfort>
 
 <question>
-结尾抛出一个引导性的问题，激发用户对现状的深层思考，或引导用户进行下一步的行动（自然温暖）。
+过渡询问：明确询问用户是否需要进一步建议或陪伴（自然温暖，必须问得很清楚）。
 </question>
 
 ❌ 禁止行为

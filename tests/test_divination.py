@@ -32,15 +32,10 @@ class TestDivinationService(unittest.TestCase):
         # 模拟 LLM 返回 XML
         mock_generate_response.return_value = """
         <hexagram>第31卦 咸卦</hexagram>
-        <source>卦辞：咸，亨，利贞，取女吉。</source>
-        <interpretation>咸卦象征感应。</interpretation>
-        <advice>
-        1. 保持真诚
-        2. 顺其自然
-        3. 多沟通
-        </advice>
+        <source>《周易·咸卦》：咸，亨，利贞，取女吉。\n这句话大意是：感应相合则亨通，守正有利，婚配为吉。</source>
+        <interpretation>咸卦象征感应与互动。这里用“更像/可能/倾向”来表达，不做绝对断言。</interpretation>
         <comfort>别担心，一切都会好的。</comfort>
-        <question>你现在感觉如何？</question>
+        <question>你需要我再给你一些更具体的建议，还是想先让我陪你聊聊？</question>
         """
         
         # 调用占卜服务
@@ -53,11 +48,10 @@ class TestDivinationService(unittest.TestCase):
         
         # 验证结果包含格式化后的内容
         self.assertIn('【第31卦 咸卦】', result)
-        self.assertIn('卦辞：咸，亨，利贞，取女吉。', result)
-        self.assertIn('咸卦象征感应。', result)
-        self.assertIn('保持真诚', result)
+        self.assertIn('《周易·咸卦》：咸，亨，利贞，取女吉。', result)
+        self.assertIn('咸卦象征感应与互动', result)
         self.assertIn('别担心，一切都会好的。', result)
-        self.assertIn('你现在感觉如何？', result)
+        self.assertIn('你需要我再给你一些更具体的建议', result)
 
 if __name__ == '__main__':
     unittest.main()

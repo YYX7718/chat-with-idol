@@ -149,8 +149,9 @@ def send_message(session_id):
                     session.transition_step = None
                     session.set_state(session.STATE_IDOL_CHAT)
 
-                    # 如果默认语言不是中文，则请求翻译
-                    need_translation = persona_config.get("default_language", "zh").lower() not in ["zh", "zh-cn", "chinese"]
+                    # 如果默认语言不是中文且不是英文，则请求翻译
+                    lang = persona_config.get("default_language", "zh").lower()
+                    need_translation = lang not in ["zh", "zh-cn", "chinese", "en", "english"]
                     idol_response = idol_chat_service.generate_idol_response(persona_config, session, translate=need_translation)
                     
                     # 添加召唤提示语
@@ -174,7 +175,8 @@ def send_message(session_id):
                 response_content = "系统错误：未找到偶像配置。请重新输入偶像名字。"
             else:
                 idol_info = session.persona_config
-                need_translation = idol_info.get("default_language", "zh").lower() not in ["zh", "zh-cn", "chinese"]
+                lang = idol_info.get("default_language", "zh").lower()
+                need_translation = lang not in ["zh", "zh-cn", "chinese", "en", "english"]
                 idol_response = idol_chat_service.generate_idol_response(idol_info, session, translate=need_translation)
                 response_content = idol_response['persona_reply']
                 if idol_response.get('translation'):
