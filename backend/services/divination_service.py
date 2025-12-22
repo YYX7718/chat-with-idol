@@ -69,13 +69,18 @@ class DivinationService:
                 return result
 
             # 格式化输出
-            formatted_result = f"【{hexagram}】\n\n"
-            formatted_result += f"{source.strip()}\n\n"
-            formatted_result += f"{interpretation.strip()}\n\n"
-            formatted_result += f"{comfort.strip()}\n\n"
-            formatted_result += f"{question.strip()}"
+            parts = []
+            if hexagram: parts.append(f"【{hexagram}】")
+            if source: parts.append(source.strip())
+            if interpretation: parts.append(interpretation.strip())
+            if comfort: parts.append(comfort.strip())
+            if question: parts.append(question.strip())
             
-            return formatted_result
+            if not parts:
+                logger.warning("No parts extracted, returning raw result")
+                return result
+                
+            return "\n\n".join(parts)
 
         except Exception as e:
             logger.error(f"Error parsing divination response: {e}")

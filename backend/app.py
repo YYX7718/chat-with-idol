@@ -116,7 +116,8 @@ def send_message(session_id):
             session.add_divination(divination_type, content, result)
             session.set_state(session.STATE_TRANSITION)
             session.transition_step = "ASK_MORE"
-            response_content = result + "\n\n如果你愿意，我也可以再陪你聊聊。你需要更多建议或陪伴吗？"
+            response_content = result
+            # 这里的过渡已经包含在 result (divination_service 生成的 <question> 标签) 中了，不再重复添加硬编码文字
             
         elif current_state == session.STATE_TRANSITION:
             step = session.transition_step or "ASK_MORE"
