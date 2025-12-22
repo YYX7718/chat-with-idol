@@ -51,13 +51,22 @@ class LLMClient:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": max_tokens,
-            "temperature": temperature
+            "temperature": temperature,
+            "stream": False # 显式禁用流式输出以提高稳定性
         }
         
-        response = requests.post(url, headers=headers, json=data)
-        response.raise_for_status()
+        # 增加重试逻辑
+        import time
+        for attempt in range(3):
+            try:
+                response = requests.post(url, headers=headers, json=data, timeout=90) # 增加超时时间
+                response.raise_for_status()
+                return response.json()["choices"][0]["message"]["content"]
+            except Exception as e:
+                if attempt == 2: raise e
+                time.sleep(1) # 等待一秒重试
         
-        return response.json()["choices"][0]["message"]["content"]
+        return "占卜由于网络波动未果，请稍后再试。"
     
     def _call_openai(self, prompt, model, max_tokens, temperature):
         """
