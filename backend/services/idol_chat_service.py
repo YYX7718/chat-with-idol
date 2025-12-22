@@ -67,11 +67,11 @@ class IdolChatService:
             s = line.strip()
             if not s:
                 continue
-            m = re.match(r"^【(.+?)】", s)
+            # 兼容更多标签格式
+            m = re.match(r"^[【\[](.+?)[】\]]", s)
             if m:
                 current = m.group(1)
                 buckets.setdefault(current, [])
-                # 如果同一行还有内容，也存入
                 content = s[m.end():].strip().lstrip(':：').strip()
                 if content:
                     buckets[current].append(content)
@@ -79,13 +79,13 @@ class IdolChatService:
             if current:
                 buckets[current].append(s)
 
-        mother_tongue = "\n".join(buckets.get("母语", [])).strip()
-        common_languages = "\n".join(buckets.get("常用语言", [])).strip()
-        speaking_pace = "\n".join(buckets.get("说话节奏", [])).strip()
-        tone_features = "\n".join(buckets.get("语气特点", [])).strip()
-        emotion_expression = "\n".join(buckets.get("情绪表达方式", [])).strip()
-        response_habits = "\n".join(buckets.get("习惯的回应方式", [])).strip()
-        avoid_style = "\n".join(buckets.get("明显避免的说话方式", [])).strip()
+        mother_tongue = "\n".join(buckets.get("母语", []) or buckets.get("Native Language", [])).strip()
+        common_languages = "\n".join(buckets.get("常用语言", []) or buckets.get("Common Languages", [])).strip()
+        speaking_pace = "\n".join(buckets.get("说话节奏", []) or buckets.get("Speaking Pace", [])).strip()
+        tone_features = "\n".join(buckets.get("语气特点", []) or buckets.get("Tone Features", [])).strip()
+        emotion_expression = "\n".join(buckets.get("情绪表达方式", []) or buckets.get("Emotion Expression", [])).strip()
+        response_habits = "\n".join(buckets.get("习惯的回应方式", []) or buckets.get("Response Habits", [])).strip()
+        avoid_style = "\n".join(buckets.get("明显避免的说话方式", []) or buckets.get("Avoiding Style", [])).strip()
 
         default_language = self._language_code_from_text(mother_tongue or common_languages)
 
@@ -93,7 +93,7 @@ class IdolChatService:
             "name": idol_name,
             "is_real_person": True,
             "default_language": default_language,
-            "mother_tongue": mother_tongue or ("中文" if default_language == "zh" else ""),
+            "mother_tongue": mother_tongue or ("中文" if default_language == "zh" else "English"),
             "common_languages": common_languages,
             "speaking_pace": speaking_pace,
             "tone_features": tone_features,
@@ -172,7 +172,9 @@ class IdolChatService:
         response = self.llm_client.generate_response(prompt)
 
         # 清理回复内容，移除可能出现的角色标签或多余的前缀
-        response = re.sub(r"^(你|我|AI|助手|Assistant|{idol_info.get('name', '')})[：:]\s*", "", response, flags=re.IGNORECASE).strip()
+        # 增加对英文前缀的清理
+        name = idol_info.get('name', '')
+        response = re.sub(rf"^(你|我|AI|助手|Assistant|{re.escape(name)})[：:]\s*", "", response, flags=re.IGNORECASE).strip()
         
         reply = {
             "persona_reply": response,
@@ -180,6 +182,8 @@ class IdolChatService:
             "reminder_virtual": "提示：本对话由虚拟 AI 人设扮演，仅供娱乐与情绪陪伴。"
         }
 
+        # 检查是否真的需要翻译：如果 default_language 是英文，且用户没有明确要求翻译，则不翻译
+        # 但这里的 translate 参数是从外部传入的，外部逻辑已经处理了 zh/en 的判断
         if translate and idol_info.get('default_language') not in ['zh', 'en']:
             trans_prompt = f"请将以下内容翻译成中文，保持口语化和原本的语气特点，不要有翻译腔：\n\n{response}"
             translation = self.llm_client.generate_response(trans_prompt)
